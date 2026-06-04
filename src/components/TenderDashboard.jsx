@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
 const TABS = [
@@ -11,20 +11,34 @@ const TABS = [
 ];
 
 const INDIAN_STATES = [
-  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", 
-  "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", 
-  "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", 
-  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", 
-  "West Bengal", "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", 
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
+  "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh",
+  "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand",
+  "West Bengal", "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
   "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
 const DOCUMENT_NAMES = ["Spec", "GCC", "IIB", "Notice", "BOQ"];
 
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  try {
+    if (dateString.includes('T')) {
+      return dateString.split('T')[0];
+    }
+    return dateString;
+  } catch (e) {
+    return dateString;
+  }
+};
+
 export default function TenderDashboard() {
   const [tenders, setTenders] = useState([]);
   const [activeTab, setActiveTab] = useState('Active Tenders');
-  
+  const [isLoadingTenders, setIsLoadingTenders] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -33,6 +47,43 @@ export default function TenderDashboard() {
 
   // Dropdown menu state for specific row
   const [activeActionMenuId, setActiveActionMenuId] = useState(null);
+
+  // Fetch tenders on mount
+  const loadTenders = async () => {
+    setIsLoadingTenders(true);
+    setFetchError('');
+    const token = localStorage.getItem('token') || '';
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/get-all`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const resData = await response.json().catch(() => null);
+
+      if (response.ok && resData?.status === 'success') {
+        const mapped = (resData.data || []).map(t => ({
+          ...t,
+          status: 'Active' // Map all backend tenders to Active Tenders tab
+        }));
+        setTenders(mapped);
+      } else {
+        setFetchError(resData?.message || resData?.error || 'Failed to retrieve tenders from server.');
+      }
+    } catch (err) {
+      console.error(err);
+      setFetchError(`Network error: ${err.message || err}. Could not connect to API server.`);
+    } finally {
+      setIsLoadingTenders(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTenders();
+  }, []);
 
   // Form state
   const initialFormState = {
@@ -51,7 +102,7 @@ export default function TenderDashboard() {
     tender_documents: [{ name: 'Spec', url: '', uploading: false, error: '', fileName: '' }]
   };
   const [formData, setFormData] = useState(initialFormState);
-  
+
   // Loading & Error States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -95,7 +146,7 @@ export default function TenderDashboard() {
   // Async document file upload handler
   const handleFileUpload = async (index, file) => {
     if (!file) return;
-    
+
     // Update uploading state for this row
     const updatedDocs = [...formData.tender_documents];
     updatedDocs[index].uploading = true;
@@ -159,8 +210,8 @@ export default function TenderDashboard() {
       tender_fee_inr: tender.tender_fee_inr.toString(),
       emd_inr: tender.emd_inr.toString(),
       // Ensure documents array exists
-      tender_documents: tender.tender_documents && tender.tender_documents.length > 0 
-        ? tender.tender_documents 
+      tender_documents: tender.tender_documents && tender.tender_documents.length > 0
+        ? tender.tender_documents
         : [{ name: '', url: '' }]
     });
     setSelectedTender(tender);
@@ -192,9 +243,9 @@ export default function TenderDashboard() {
 
     // Client-side validations
     if (!formData.tender_id.trim() || !formData.tender_ref_no.trim() || !formData.tender_title.trim() ||
-        !formData.tender_organization.trim() || !formData.cable_length_km || !formData.publish_date ||
-        !formData.closing_date || !formData.tender_value_cr || !formData.tender_fee_inr ||
-        !formData.emd_inr || !formData.state) {
+      !formData.tender_organization.trim() || !formData.cable_length_km || !formData.publish_date ||
+      !formData.closing_date || !formData.tender_value_cr || !formData.tender_fee_inr ||
+      !formData.emd_inr || !formData.state) {
       setSubmitError('All fields are required.');
       setIsSubmitting(false);
       return;
@@ -246,7 +297,7 @@ export default function TenderDashboard() {
 
     try {
       const token = localStorage.getItem('token') || '';
-      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/create-tender`, {
+      const response = await fetch(`${API_BASE_URL}/tenders/create-tender`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -259,20 +310,9 @@ export default function TenderDashboard() {
 
       if (response.ok) {
         setSubmitSuccess('Tender created successfully!');
-        
-        // Add new tender to local state
-        const newTender = {
-          ...payload,
-          status: formData.status // Maintain selected status for tabs
-        };
 
-        if (isEditModalOpen) {
-          // If editing (mocking update)
-          setTenders(prev => prev.map(t => t.tender_id === selectedTender.tender_id ? newTender : t));
-        } else {
-          // If creating new
-          setTenders(prev => [...prev, newTender]);
-        }
+        // Refresh tenders from backend
+        loadTenders();
 
         // Reset form & close modal after delay
         setTimeout(() => {
@@ -313,13 +353,13 @@ export default function TenderDashboard() {
       state: formData.state,
       status: formData.status
     };
-    
+
     if (isEditModalOpen) {
       setTenders(prev => prev.map(t => t.tender_id === selectedTender.tender_id ? newTender : t));
     } else {
       setTenders(prev => [...prev, newTender]);
     }
-    
+
     setIsAddModalOpen(false);
     setIsEditModalOpen(false);
     setFormData(initialFormState);
@@ -359,16 +399,15 @@ export default function TenderDashboard() {
         {TABS.map(tab => {
           const isActive = activeTab === tab.id;
           const count = tenders.filter(t => t.status === tab.statusValue).length;
-          
+
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 min-w-max text-center py-2.5 px-4 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${
-                isActive
+              className={`flex-1 min-w-max text-center py-2.5 px-4 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${isActive
                   ? 'bg-slate-50 text-sky-600 shadow-sm border border-slate-100'
                   : 'text-slate-500 hover:bg-slate-50/50 hover:text-slate-800'
-              }`}
+                }`}
             >
               {tab.label}
               {count > 0 && (
@@ -387,18 +426,54 @@ export default function TenderDashboard() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/75 border-b border-slate-200">
-                <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Tender ID</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Project Name</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Due Date</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Value</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="py-4 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tender ID</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Reference Number</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Project Name</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Organization</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Cable Length</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">State</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Publish Date</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Closing Date</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tender Value</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tender Fee / EMD</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredTenders.length === 0 ? (
+              {isLoadingTenders ? (
                 <tr>
-                  <td colSpan="6" className="py-12 px-6 text-center">
+                  <td colSpan="12" className="py-12 px-6 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <svg className="animate-spin h-7 w-7 text-sky-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      <span className="text-xs font-semibold text-slate-500">Fetching tenders from database...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : fetchError ? (
+                <tr>
+                  <td colSpan="12" className="py-12 px-6 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-2 text-rose-600">
+                      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span className="text-xs font-bold">Failed to load tenders</span>
+                      <p className="text-[11px] text-slate-500 max-w-md">{fetchError}</p>
+                      <button 
+                        onClick={loadTenders}
+                        className="mt-2 text-[10px] font-bold text-sky-500 bg-sky-50 hover:bg-sky-100/75 border border-sky-100 px-3 py-1 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Retry Fetch
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredTenders.length === 0 ? (
+                <tr>
+                  <td colSpan="12" className="py-12 px-6 text-center">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <div className="p-3 bg-slate-50 rounded-full text-slate-400">
                         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -452,11 +527,17 @@ export default function TenderDashboard() {
 
                   return (
                     <tr key={tender.tender_id} className="hover:bg-slate-50/85 transition-colors group">
-                      <td className="py-4 px-6 text-sm font-semibold text-slate-800">{tender.tender_id}</td>
-                      <td className="py-4 px-6 text-sm text-slate-650">{tender.tender_title}</td>
-                      <td className="py-4 px-6 text-sm text-slate-500">{tender.closing_date}</td>
-                      <td className="py-4 px-6 text-sm font-semibold text-slate-700">₹{tender.tender_value_cr} Cr</td>
-                      <td className="py-4 px-6 text-sm">
+                      <td className="py-4 px-4 text-sm font-semibold text-slate-800 whitespace-nowrap">{tender.tender_id}</td>
+                      <td className="py-4 px-4 text-sm text-slate-650 whitespace-nowrap">{tender.tender_ref_no}</td>
+                      <td className="py-4 px-4 text-sm text-slate-650 whitespace-nowrap">{tender.tender_title}</td>
+                      <td className="py-4 px-4 text-sm text-slate-500 whitespace-nowrap">{tender.tender_organization}</td>
+                      <td className="py-4 px-4 text-sm text-slate-500 whitespace-nowrap">{tender.cable_length_km} KM</td>
+                      <td className="py-4 px-4 text-sm text-slate-500 whitespace-nowrap">{tender.state}</td>
+                      <td className="py-4 px-4 text-sm text-slate-500 whitespace-nowrap">{formatDate(tender.publish_date)}</td>
+                      <td className="py-4 px-4 text-sm text-slate-500 whitespace-nowrap">{formatDate(tender.closing_date)}</td>
+                      <td className="py-4 px-4 text-sm font-semibold text-slate-700 whitespace-nowrap">₹{Number(tender.tender_value_cr || 0).toFixed(2)} Cr</td>
+                      <td className="py-4 px-4 text-sm text-slate-600 whitespace-nowrap">₹{Number(tender.tender_fee_inr || 0).toFixed(2)} / ₹{Number(tender.emd_inr || 0).toFixed(2)}</td>
+                      <td className="py-4 px-4 text-sm whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeClass}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
                           {tender.status}
@@ -475,7 +556,7 @@ export default function TenderDashboard() {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
-                          
+
                           {/* Edit button */}
                           <button
                             onClick={() => openEditModal(tender)}
@@ -500,8 +581,8 @@ export default function TenderDashboard() {
 
                             {activeActionMenuId === tender.tender_id && (
                               <>
-                                <div 
-                                  className="fixed inset-0 z-10" 
+                                <div
+                                  className="fixed inset-0 z-10"
                                   onClick={() => setActiveActionMenuId(null)}
                                 />
                                 <div className="absolute right-0 mt-1 w-32 origin-top-right rounded-lg bg-white border border-slate-200 shadow-lg py-1 z-20">
@@ -563,7 +644,7 @@ export default function TenderDashboard() {
                     <span className="font-semibold">Submission Error</span>
                   </div>
                   <p className="text-xs">{submitError}</p>
-                  <button 
+                  <button
                     type="button"
                     onClick={handleCreateLocally}
                     className="self-start mt-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-semibold transition-colors cursor-pointer"
@@ -778,7 +859,7 @@ export default function TenderDashboard() {
                             ))}
                           </select>
                         </div>
-                        
+
                         {/* Document PDF Upload */}
                         <div>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Document PDF <span className="text-rose-500">*</span></label>
@@ -799,10 +880,10 @@ export default function TenderDashboard() {
                                   </svg>
                                   {doc.fileName || 'Uploaded.pdf'}
                                 </span>
-                                <a 
-                                  href={doc.url} 
-                                  target="_blank" 
-                                  rel="noreferrer" 
+                                <a
+                                  href={doc.url}
+                                  target="_blank"
+                                  rel="noreferrer"
                                   className="text-[10px] text-sky-500 hover:text-sky-600 font-bold ml-2 shrink-0 uppercase"
                                 >
                                   View
@@ -814,8 +895,8 @@ export default function TenderDashboard() {
 
                             {!doc.uploading && (
                               <div>
-                                <label 
-                                  htmlFor={`file-upload-${idx}`} 
+                                <label
+                                  htmlFor={`file-upload-${idx}`}
                                   className="cursor-pointer bg-white px-3 py-1.5 border border-slate-200 rounded text-xs text-sky-600 hover:bg-sky-50/50 hover:border-sky-300 transition-all font-semibold shadow-xs flex items-center gap-1 shrink-0"
                                 >
                                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -931,7 +1012,7 @@ export default function TenderDashboard() {
                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Tender ID</span>
                     <span className="text-xs font-semibold text-slate-700">{selectedTender.tender_id}</span>
                   </div>
-                  
+
                   <div>
                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Reference Number</span>
                     <span className="text-xs font-semibold text-slate-700">{selectedTender.tender_ref_no}</span>
@@ -949,22 +1030,22 @@ export default function TenderDashboard() {
 
                   <div>
                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Publish Date</span>
-                    <span className="text-xs font-semibold text-slate-700">{selectedTender.publish_date}</span>
+                    <span className="text-xs font-semibold text-slate-700">{formatDate(selectedTender.publish_date)}</span>
                   </div>
 
                   <div>
                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Closing Date</span>
-                    <span className="text-xs font-semibold text-slate-700 text-rose-600">{selectedTender.closing_date}</span>
+                    <span className="text-xs font-semibold text-slate-700 text-rose-600">{formatDate(selectedTender.closing_date)}</span>
                   </div>
 
                   <div>
                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Tender Value</span>
-                    <span className="text-xs font-bold text-slate-800">₹{selectedTender.tender_value_cr} Cr</span>
+                    <span className="text-xs font-bold text-slate-800">₹{Number(selectedTender.tender_value_cr || 0).toFixed(2)} Cr</span>
                   </div>
 
                   <div>
                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Tender Fee / EMD</span>
-                    <span className="text-xs font-semibold text-slate-700">₹{selectedTender.tender_fee_inr.toLocaleString()} / ₹{selectedTender.emd_inr.toLocaleString()}</span>
+                    <span className="text-xs font-semibold text-slate-700">₹{Number(selectedTender.tender_fee_inr || 0).toFixed(2)} / ₹{Number(selectedTender.emd_inr || 0).toFixed(2)}</span>
                   </div>
                 </div>
 
