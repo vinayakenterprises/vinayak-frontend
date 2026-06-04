@@ -10,6 +10,17 @@ const TABS = [
   { id: 'Assigned by Accounts Team', label: 'Assigned by Accounts Team', statusValue: 'Assigned' }
 ];
 
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", 
+  "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", 
+  "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", 
+  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", 
+  "West Bengal", "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", 
+  "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+];
+
+const DOCUMENT_NAMES = ["Spec", "GCC", "IIB", "Notice", "BOQ"];
+
 export default function TenderDashboard() {
   const [tenders, setTenders] = useState([]);
   const [activeTab, setActiveTab] = useState('Active Tenders');
@@ -35,9 +46,9 @@ export default function TenderDashboard() {
     tender_value_cr: '',
     tender_fee_inr: '',
     emd_inr: '',
-    state: '',
+    state: 'Uttar Pradesh',
     status: 'Active',
-    tender_documents: [{ name: '', url: '' }]
+    tender_documents: [{ name: 'Spec', url: '', uploading: false, error: '', fileName: '' }]
   };
   const [formData, setFormData] = useState(initialFormState);
   
@@ -68,7 +79,7 @@ export default function TenderDashboard() {
   const addDocumentRow = () => {
     setFormData(prev => ({
       ...prev,
-      tender_documents: [...prev.tender_documents, { name: '', url: '' }]
+      tender_documents: [...prev.tender_documents, { name: 'Spec', url: '', uploading: false, error: '', fileName: '' }]
     }));
   };
 
@@ -79,6 +90,64 @@ export default function TenderDashboard() {
       ...prev,
       tender_documents: updatedDocs
     }));
+  };
+
+  // Async document file upload handler
+  const handleFileUpload = async (index, file) => {
+    if (!file) return;
+    
+    // Update uploading state for this row
+    const updatedDocs = [...formData.tender_documents];
+    updatedDocs[index].uploading = true;
+    updatedDocs[index].error = '';
+    updatedDocs[index].fileName = file.name;
+    setFormData(prev => ({
+      ...prev,
+      tender_documents: updatedDocs
+    }));
+
+    const token = localStorage.getItem('token') || '';
+    const uploadFormData = new FormData();
+    uploadFormData.append('pdf-file', file);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/upload-document`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadFormData
+      });
+
+      const resData = await response.json().catch(() => null);
+
+      if (response.ok && resData?.status === 'success') {
+        const url = resData.data.url;
+        setFormData(prev => {
+          const docs = [...prev.tender_documents];
+          docs[index].url = url;
+          docs[index].uploading = false;
+          docs[index].error = '';
+          return { ...prev, tender_documents: docs };
+        });
+      } else {
+        const error = resData?.message || resData?.error || 'Upload failed';
+        setFormData(prev => {
+          const docs = [...prev.tender_documents];
+          docs[index].uploading = false;
+          docs[index].error = error;
+          return { ...prev, tender_documents: docs };
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setFormData(prev => {
+        const docs = [...prev.tender_documents];
+        docs[index].uploading = false;
+        docs[index].error = `Upload error: ${err.message || err}`;
+        return { ...prev, tender_documents: docs };
+      });
+    }
   };
 
   // Open Edit Modal
@@ -125,7 +194,7 @@ export default function TenderDashboard() {
     if (!formData.tender_id.trim() || !formData.tender_ref_no.trim() || !formData.tender_title.trim() ||
         !formData.tender_organization.trim() || !formData.cable_length_km || !formData.publish_date ||
         !formData.closing_date || !formData.tender_value_cr || !formData.tender_fee_inr ||
-        !formData.emd_inr || !formData.state.trim()) {
+        !formData.emd_inr || !formData.state) {
       setSubmitError('All fields are required.');
       setIsSubmitting(false);
       return;
@@ -134,16 +203,26 @@ export default function TenderDashboard() {
     // Validate documents
     for (let i = 0; i < formData.tender_documents.length; i++) {
       const doc = formData.tender_documents[i];
-      if (!doc.name.trim() || !doc.url.trim()) {
-        setSubmitError(`Please fill all fields for Document #${i + 1}.`);
+      if (doc.uploading) {
+        setSubmitError(`Document #${i + 1} is still uploading. Please wait for it to complete.`);
         setIsSubmitting(false);
         return;
       }
-      // Simple URL validation
+      if (!doc.name) {
+        setSubmitError(`Please specify the document type for Document #${i + 1}.`);
+        setIsSubmitting(false);
+        return;
+      }
+      if (!doc.url) {
+        setSubmitError(`Please upload a PDF file for Document #${i + 1}.`);
+        setIsSubmitting(false);
+        return;
+      }
+      // Validate S3 URL format
       try {
         new URL(doc.url);
       } catch (_) {
-        setSubmitError(`Document #${i + 1} URL is not valid. Please provide a full URL (e.g. https://example.com/doc.pdf).`);
+        setSubmitError(`Document #${i + 1} S3 URL is not valid.`);
         setIsSubmitting(false);
         return;
       }
@@ -153,7 +232,7 @@ export default function TenderDashboard() {
     const payload = {
       tender_id: formData.tender_id,
       tender_ref_no: formData.tender_ref_no,
-      tender_documents: formData.tender_documents,
+      tender_documents: formData.tender_documents.map(d => ({ name: d.name, url: d.url })),
       tender_title: formData.tender_title,
       tender_organization: formData.tender_organization,
       cable_length_km: Number(formData.cable_length_km),
@@ -167,7 +246,7 @@ export default function TenderDashboard() {
 
     try {
       const token = localStorage.getItem('token') || '';
-      const response = await fetch(`${API_BASE_URL}/tenders/create-tender`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/create-tender`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -647,32 +726,19 @@ export default function TenderDashboard() {
                   />
                 </div>
 
-                {/* State */}
+                {/* State (Indian States Dropdown) */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">State <span className="text-rose-500">*</span></label>
-                  <input
-                    type="text"
+                  <select
                     name="state"
                     value={formData.state}
                     onChange={handleInputChange}
                     required
-                    placeholder="e.g. Uttar Pradesh"
-                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow"
-                  />
-                </div>
-
-                {/* Category / Status Selection (Helps sorting in UI tabs) */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Initial Category / Tab <span className="text-rose-500">*</span></label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    required
                     className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none bg-white focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow"
                   >
-                    {TABS.map(tab => (
-                      <option key={tab.id} value={tab.statusValue}>{tab.label}</option>
+                    <option value="" disabled>Select State</option>
+                    {INDIAN_STATES.map(stateName => (
+                      <option key={stateName} value={stateName}>{stateName}</option>
                     ))}
                   </select>
                 </div>
@@ -698,27 +764,81 @@ export default function TenderDashboard() {
                   {formData.tender_documents.map((doc, idx) => (
                     <div key={idx} className="flex gap-3 items-end bg-slate-50 p-3 rounded-lg border border-slate-150">
                       <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Document Name Dropdown */}
                         <div>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Document Name <span className="text-rose-500">*</span></label>
-                          <input
-                            type="text"
+                          <select
                             value={doc.name}
                             onChange={(e) => handleDocumentChange(idx, 'name', e.target.value)}
                             required
-                            placeholder="e.g. NIT Document"
                             className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded text-xs focus:outline-none focus:border-sky-500"
-                          />
+                          >
+                            {DOCUMENT_NAMES.map(name => (
+                              <option key={name} value={name}>{name}</option>
+                            ))}
+                          </select>
                         </div>
+                        
+                        {/* Document PDF Upload */}
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Document URL <span className="text-rose-500">*</span></label>
-                          <input
-                            type="text"
-                            value={doc.url}
-                            onChange={(e) => handleDocumentChange(idx, 'url', e.target.value)}
-                            required
-                            placeholder="e.g. https://example.com/docs/nit.pdf"
-                            className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded text-xs focus:outline-none focus:border-sky-500"
-                          />
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Document PDF <span className="text-rose-500">*</span></label>
+                          <div className="flex items-center gap-2">
+                            {doc.uploading ? (
+                              <div className="flex items-center gap-1.5 py-1.5 text-xs text-slate-500 font-medium">
+                                <svg className="animate-spin h-3.5 w-3.5 text-sky-500" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Uploading PDF...
+                              </div>
+                            ) : doc.url ? (
+                              <div className="flex-1 flex items-center justify-between bg-white border border-emerald-100 rounded px-2.5 py-1.5 text-xs text-emerald-700 font-medium truncate">
+                                <span className="truncate flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  {doc.fileName || 'Uploaded.pdf'}
+                                </span>
+                                <a 
+                                  href={doc.url} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="text-[10px] text-sky-500 hover:text-sky-600 font-bold ml-2 shrink-0 uppercase"
+                                >
+                                  View
+                                </a>
+                              </div>
+                            ) : (
+                              <div className="flex-1 text-slate-400 italic text-xs py-1.5">No file uploaded</div>
+                            )}
+
+                            {!doc.uploading && (
+                              <div>
+                                <label 
+                                  htmlFor={`file-upload-${idx}`} 
+                                  className="cursor-pointer bg-white px-3 py-1.5 border border-slate-200 rounded text-xs text-sky-600 hover:bg-sky-50/50 hover:border-sky-300 transition-all font-semibold shadow-xs flex items-center gap-1 shrink-0"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                  </svg>
+                                  {doc.url ? 'Replace' : 'Upload'}
+                                </label>
+                                <input
+                                  id={`file-upload-${idx}`}
+                                  type="file"
+                                  accept=".pdf"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleFileUpload(idx, file);
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          {doc.error && (
+                            <p className="text-[10px] text-rose-500 font-medium mt-1">{doc.error}</p>
+                          )}
                         </div>
                       </div>
 

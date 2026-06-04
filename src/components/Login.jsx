@@ -22,7 +22,7 @@ export default function Login({ onLoginSuccess }) {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -37,11 +37,11 @@ export default function Login({ onLoginSuccess }) {
 
       if (response.ok && responseData?.status === 'success') {
         const { token, user } = responseData.data;
-        
+
         // Save to localStorage
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
-        
+
         // Notify parent
         onLoginSuccess(user, token);
       } else {
