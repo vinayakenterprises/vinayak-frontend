@@ -16,7 +16,7 @@ import UserProfile from './UserProfile/UserProfile';
  * @param {string} [props.className=''] - Additional Tailwind classes for layout adjustments
  */
 export const Header = ({
-  logoText = 'Vinayak Enterprisessdsdfsd',
+  logoText = 'Vinayak Enterprises',
   logoLetter = 'V',
   logoBg = 'bg-sky-500',
   userName = 'Manish',
@@ -25,6 +25,7 @@ export const Header = ({
   userDropdownItems = [],
   children,
   className = '',
+  logoUrl,
 }) => {
   return (
     <header
@@ -32,11 +33,15 @@ export const Header = ({
     >
       {/* Brand Logo Section */}
       <div className="flex items-center gap-3">
-        <div
-          className={`w-9 h-9 rounded-xl ${logoBg} flex items-center justify-center text-white font-extrabold text-lg shadow-sm shadow-blue-500/10`}
-        >
-          {logoLetter}
-        </div>
+        {logoUrl ? (
+          <img src={logoUrl} alt="Logo" className="w-9 h-9 object-contain rounded-xl shadow-sm border border-slate-100 bg-white" />
+        ) : (
+          <div
+            className={`w-9 h-9 rounded-xl ${logoBg} flex items-center justify-center text-white font-extrabold text-lg shadow-sm shadow-blue-500/10`}
+          >
+            {logoLetter}
+          </div>
+        )}
         <span className="font-bold text-slate-850 dark:text-slate-100 text-lg tracking-tight select-none">
           {logoText}
         </span>

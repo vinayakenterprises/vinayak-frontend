@@ -1,13 +1,38 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Header from './components/common/Header';
 import manishAvatar from './assets/manish_avatar.png';
+import veLogo from './assets/VE Logo.avif';
+import TenderDashboard from './components/TenderDashboard';
+import Login from './components/Login';
 
 function App() {
-  // Sample dropdown menu actions for testing interactivity
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [token, setToken] = useState(() => localStorage.getItem('token') || '');
+
+  const handleLoginSuccess = (loggedInUser, userToken) => {
+    setUser(loggedInUser);
+    setToken(userToken);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    setUser(null);
+    setToken('');
+  };
+
+  // User profile actions
   const userDropdownItems = [
     {
       label: 'My Profile',
-      onClick: () => alert('My Profile Clicked'),
+      onClick: () => alert(`Profile of ${user?.username} (${user?.email_id})`),
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -28,7 +53,7 @@ function App() {
     {
       label: 'Log out',
       danger: true,
-      onClick: () => alert('Logged Out Successfully'),
+      onClick: handleLogout,
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -37,20 +62,23 @@ function App() {
     },
   ];
 
+  if (!user) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
       <Header
         logoText="Vinayak Enterprises"
-        logoLetter="V"
-        userName="Manish"
-        userRole="Tender Coordinator"
+        logoUrl={veLogo}
+        userName={user.username}
+        userRole={`${user.role} (${user.department})`}
         userAvatarUrl={manishAvatar}
         userDropdownItems={userDropdownItems}
       />
 
-      {/* Rest of the page contents are blank as requested */}
-      <main className="p-8 max-w-7xl mx-auto">
-        {/* Placeholder workspace area */}
+      <main className="mx-auto max-w-7xl">
+        <TenderDashboard />
       </main>
     </div>
   );
