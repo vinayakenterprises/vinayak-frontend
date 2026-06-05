@@ -5,6 +5,7 @@ import veLogo from './assets/VE Logo.avif';
 import TenderDashboard from './components/TenderDashboard';
 import MDDashboard from './components/MDDashboard';
 import Login from './components/Login';
+import AccountsTeamDashboard from './components/AccountsTeamDashboard';
 
 function App() {
   const [user, setUser] = useState(() => {
@@ -83,6 +84,8 @@ function App() {
           <TenderDashboard />
         ) : user.role === 'MD' ? (
           <MDDashboard />
+        ) : user.role === 'tender_handler_accounts' ? (
+          <AccountsTeamDashboard />
         ) : (
           <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center">
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-10 max-w-md w-full space-y-4">
