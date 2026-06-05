@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Header from './components/common/Header';
 import manishAvatar from './assets/manish_avatar.png';
 import veLogo from './assets/VE Logo.avif';
 import TenderDashboard from './components/TenderDashboard';
+import MDDashboard from './components/MDDashboard';
 import Login from './components/Login';
 
 function App() {
@@ -10,11 +11,11 @@ function App() {
     try {
       const savedUser = localStorage.getItem('user');
       return savedUser ? JSON.parse(savedUser) : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   });
-  const [token, setToken] = useState(() => localStorage.getItem('token') || '');
+  const [, setToken] = useState(() => localStorage.getItem('token') || '');
 
   const handleLoginSuccess = (loggedInUser, userToken) => {
     setUser(loggedInUser);
@@ -77,8 +78,29 @@ function App() {
         userDropdownItems={userDropdownItems}
       />
 
-      <main className="mx-auto max-w-7xl">
-        <TenderDashboard />
+      <main className="mx-auto max-w-7xl p-4">
+        {user.role === 'tender_agent' ? (
+          <TenderDashboard />
+        ) : user.role === 'MD' ? (
+          <MDDashboard />
+        ) : (
+          <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-10 max-w-md w-full space-y-4">
+              <div className="w-16 h-16 bg-rose-50 dark:bg-rose-950 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Access Denied</h2>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">
+                Your Role is not Defined yet.
+              </p>
+              <div className="text-xs text-slate-400 dark:text-slate-500 pt-2 border-t border-slate-100 dark:border-slate-800">
+                Logged in as: <span className="font-semibold">{user.role}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
