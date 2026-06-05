@@ -45,6 +45,11 @@ export default function TenderDashboard() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTender, setSelectedTender] = useState(null);
 
+  // Approval states
+  const [isSendingApproval, setIsSendingApproval] = useState(false);
+  const [approvalError, setApprovalError] = useState('');
+  const [approvalSuccess, setApprovalSuccess] = useState('');
+
   // Dropdown menu state for specific row
   const [activeActionMenuId, setActiveActionMenuId] = useState(null);
 
@@ -222,8 +227,45 @@ export default function TenderDashboard() {
   // Open View Modal
   const openViewModal = (tender) => {
     setSelectedTender(tender);
+    setApprovalError('');
+    setApprovalSuccess('');
     setIsViewModalOpen(true);
     setActiveActionMenuId(null);
+  };
+
+  // Send Tender for Approval
+  const handleSendForApproval = async (tender) => {
+    setIsSendingApproval(true);
+    setApprovalError('');
+    setApprovalSuccess('');
+    const token = localStorage.getItem('token') || '';
+    const tenderId = tender.id || tender.tender_id;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/send-for-approval/${tenderId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const resData = await response.json().catch(() => null);
+
+      if (response.ok) {
+        setApprovalSuccess(resData?.message || 'Tender sent for approval successfully!');
+        setSelectedTender(prev => prev ? { ...prev, send_for_approaval: true } : null);
+        // Refresh tenders list
+        loadTenders();
+      } else {
+        setApprovalError(resData?.message || resData?.error || 'Failed to send tender for approval.');
+      }
+    } catch (err) {
+      console.error(err);
+      setApprovalError(`Network error: ${err.message || err}. Could not connect to API server.`);
+    } finally {
+      setIsSendingApproval(false);
+    }
   };
 
   // Delete Tender
@@ -988,6 +1030,27 @@ export default function TenderDashboard() {
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {approvalError && (
+                <div className="bg-rose-50 border border-rose-100 text-rose-800 text-xs p-4 rounded-xl flex flex-col gap-1.5 animate-fadeIn">
+                  <div className="flex gap-2 items-center">
+                    <svg className="w-4 h-4 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="font-semibold text-xs">Error sending for approval</span>
+                  </div>
+                  <p className="text-[11px]">{approvalError}</p>
+                </div>
+              )}
+
+              {approvalSuccess && (
+                <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs p-4 rounded-xl flex items-center gap-2 animate-fadeIn">
+                  <svg className="w-4.5 h-4.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-semibold text-xs">{approvalSuccess}</span>
+                </div>
+              )}
+
               <div className="space-y-4">
                 {/* ID & Status */}
                 <div className="flex justify-between items-start">
@@ -1073,7 +1136,26 @@ export default function TenderDashboard() {
             </div>
 
             {/* Modal Footer */}
-            <div className="border-t border-slate-100 p-4 bg-slate-50/50 flex justify-end">
+            <div className="border-t border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center">
+              <button
+                onClick={() => handleSendForApproval(selectedTender)}
+                disabled={isSendingApproval || selectedTender?.send_for_approaval}
+                className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-400 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                {isSendingApproval ? (
+                  <>
+                    <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Sending...
+                  </>
+                ) : selectedTender?.send_for_approaval ? (
+                  'Already Sent For Approval'
+                ) : (
+                  'Send For Approval'
+                )}
+              </button>
               <button
                 onClick={() => setIsViewModalOpen(false)}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
