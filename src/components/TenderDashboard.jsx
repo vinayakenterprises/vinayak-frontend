@@ -339,7 +339,7 @@ export default function TenderDashboard() {
 
     try {
       const token = localStorage.getItem('token') || '';
-      const response = await fetch(`${API_BASE_URL}/tenders/create-tender`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/create-tender`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -379,34 +379,34 @@ export default function TenderDashboard() {
   };
 
   // Force local creation on API error (helpful for manual testing if backend has connection issues)
-  const handleCreateLocally = () => {
-    const newTender = {
-      tender_id: formData.tender_id,
-      tender_ref_no: formData.tender_ref_no,
-      tender_documents: formData.tender_documents,
-      tender_title: formData.tender_title,
-      tender_organization: formData.tender_organization,
-      cable_length_km: Number(formData.cable_length_km),
-      publish_date: formData.publish_date,
-      closing_date: formData.closing_date,
-      tender_value_cr: Number(formData.tender_value_cr),
-      tender_fee_inr: Number(formData.tender_fee_inr),
-      emd_inr: Number(formData.emd_inr),
-      state: formData.state,
-      status: formData.status
-    };
+  // const handleCreateLocally = () => {
+  //   const newTender = {
+  //     tender_id: formData.tender_id,
+  //     tender_ref_no: formData.tender_ref_no,
+  //     tender_documents: formData.tender_documents,
+  //     tender_title: formData.tender_title,
+  //     tender_organization: formData.tender_organization,
+  //     cable_length_km: Number(formData.cable_length_km),
+  //     publish_date: formData.publish_date,
+  //     closing_date: formData.closing_date,
+  //     tender_value_cr: Number(formData.tender_value_cr),
+  //     tender_fee_inr: Number(formData.tender_fee_inr),
+  //     emd_inr: Number(formData.emd_inr),
+  //     state: formData.state,
+  //     status: formData.status
+  //   };
 
-    if (isEditModalOpen) {
-      setTenders(prev => prev.map(t => t.tender_id === selectedTender.tender_id ? newTender : t));
-    } else {
-      setTenders(prev => [...prev, newTender]);
-    }
+  //   if (isEditModalOpen) {
+  //     setTenders(prev => prev.map(t => t.tender_id === selectedTender.tender_id ? newTender : t));
+  //   } else {
+  //     setTenders(prev => [...prev, newTender]);
+  //   }
 
-    setIsAddModalOpen(false);
-    setIsEditModalOpen(false);
-    setFormData(initialFormState);
-    setSubmitError('');
-  };
+  //   setIsAddModalOpen(false);
+  //   setIsEditModalOpen(false);
+  //   setFormData(initialFormState);
+  //   setSubmitError('');
+  // };
 
   // Filter tenders based on selected tab's status mapping
   const selectedTabObj = TABS.find(t => t.id === activeTab);
@@ -679,13 +679,13 @@ export default function TenderDashboard() {
                     <span className="font-semibold">Submission Error</span>
                   </div>
                   <p className="text-xs">{submitError}</p>
-                  <button
+                  {/* <button
                     type="button"
                     onClick={handleCreateLocally}
                     className="self-start mt-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-semibold transition-colors cursor-pointer"
                   >
                     Bypass API & Create Locally
-                  </button>
+                  </button> */}
                 </div>
               )}
 
