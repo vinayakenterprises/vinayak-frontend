@@ -7,7 +7,7 @@ const TABS = [
   { id: 'Rejected Tender', label: 'Rejected Tender', statusValue: 'Rejected' },
   { id: 'Shortfall Raised', label: 'Shortfall Raised', statusValue: 'Shortfall Raised' },
   { id: 'Submitted Tenders', label: 'Submitted Tenders', statusValue: 'Submitted' },
-  { id: 'Assigned by Accounts Team', label: 'Assigned by Accounts Team', statusValue: 'Assigned' }
+  { id: 'Assigned by Accounts Team', label: 'Assigned by Accounts Team', statusValue: 'AssignedByAccountsTeam' }
 ];
 
 const INDIAN_STATES = [
@@ -70,10 +70,24 @@ export default function TenderDashboard() {
       const resData = await response.json().catch(() => null);
 
       if (response.ok && resData?.status === 'success') {
-        const mapped = (resData.data || []).map(t => ({
-          ...t,
-          status: 'Active' // Map all backend tenders to Active Tenders tab
-        }));
+        const mapped = (resData.data || []).map(t => {
+          if (t.is_accounts_team_work_done && Number(t.tender_stage) === 4) {
+            return {
+              ...t,
+              status: 'AssignedByAccountsTeam'
+            };
+          }
+          if (t.send_for_approaval) {
+            return {
+              ...t,
+              status: 'Pending MD Approval'
+            };
+          }
+          return {
+            ...t,
+            status: 'Active'
+          };
+        });
         setTenders(mapped);
       } else {
         setFetchError(resData?.message || resData?.error || 'Failed to retrieve tenders from server.');
@@ -561,7 +575,7 @@ export default function TenderDashboard() {
                   } else if (tender.status === 'Submitted') {
                     badgeClass = 'bg-sky-50 text-sky-700 border-sky-100';
                     dotClass = 'bg-sky-500';
-                  } else if (tender.status === 'Assigned') {
+                  } else if (tender.status === 'AssignedByAccountsTeam') {
                     badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-100';
                     dotClass = 'bg-indigo-500';
                   }
