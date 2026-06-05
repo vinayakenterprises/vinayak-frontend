@@ -405,8 +405,8 @@ export default function TenderDashboard() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 min-w-max text-center py-2.5 px-4 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${isActive
-                  ? 'bg-slate-50 text-sky-600 shadow-sm border border-slate-100'
-                  : 'text-slate-500 hover:bg-slate-50/50 hover:text-slate-800'
+                ? 'bg-slate-50 text-sky-600 shadow-sm border border-slate-100'
+                : 'text-slate-500 hover:bg-slate-50/50 hover:text-slate-800'
                 }`}
             >
               {tab.label}
@@ -436,14 +436,13 @@ export default function TenderDashboard() {
                 <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Closing Date</th>
                 <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tender Value</th>
                 <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tender Fee / EMD</th>
-                <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
                 <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoadingTenders ? (
                 <tr>
-                  <td colSpan="12" className="py-12 px-6 text-center">
+                  <td colSpan="11" className="py-12 px-6 text-center">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <svg className="animate-spin h-7 w-7 text-sky-500" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -455,14 +454,14 @@ export default function TenderDashboard() {
                 </tr>
               ) : fetchError ? (
                 <tr>
-                  <td colSpan="12" className="py-12 px-6 text-center">
+                  <td colSpan="11" className="py-12 px-6 text-center">
                     <div className="flex flex-col items-center justify-center space-y-2 text-rose-600">
                       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                       <span className="text-xs font-bold">Failed to load tenders</span>
                       <p className="text-[11px] text-slate-500 max-w-md">{fetchError}</p>
-                      <button 
+                      <button
                         onClick={loadTenders}
                         className="mt-2 text-[10px] font-bold text-sky-500 bg-sky-50 hover:bg-sky-100/75 border border-sky-100 px-3 py-1 rounded-lg transition-colors cursor-pointer"
                       >
@@ -473,7 +472,7 @@ export default function TenderDashboard() {
                 </tr>
               ) : filteredTenders.length === 0 ? (
                 <tr>
-                  <td colSpan="12" className="py-12 px-6 text-center">
+                  <td colSpan="11" className="py-12 px-6 text-center">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <div className="p-3 bg-slate-50 rounded-full text-slate-400">
                         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -504,7 +503,7 @@ export default function TenderDashboard() {
                   // Style badge according to status value
                   let badgeClass = 'bg-slate-50 text-slate-600 border-slate-100';
                   let dotClass = 'bg-slate-400';
-                  
+
                   if (tender.status === 'Active') {
                     badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
                     dotClass = 'bg-emerald-500';
@@ -537,12 +536,6 @@ export default function TenderDashboard() {
                       <td className="py-4 px-4 text-sm text-slate-500 whitespace-nowrap">{formatDate(tender.closing_date)}</td>
                       <td className="py-4 px-4 text-sm font-semibold text-slate-700 whitespace-nowrap">₹{Number(tender.tender_value_cr || 0).toFixed(2)} Cr</td>
                       <td className="py-4 px-4 text-sm text-slate-600 whitespace-nowrap">₹{Number(tender.tender_fee_inr || 0).toFixed(2)} / ₹{Number(tender.emd_inr || 0).toFixed(2)}</td>
-                      <td className="py-4 px-4 text-sm whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeClass}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
-                          {tender.status}
-                        </span>
-                      </td>
                       <td className="py-4 px-6 text-sm text-right relative">
                         <div className="flex items-center justify-end gap-1">
                           {/* View button */}
