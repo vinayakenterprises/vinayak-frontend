@@ -77,7 +77,7 @@ export default function TenderDashboard() {
               status: 'AssignedByAccountsTeam'
             };
           }
-          if (t.send_for_approaval) {
+          if (t.send_for_approaval && t.tender_stage == 2) {
             return {
               ...t,
               status: 'Pending MD Approval'
@@ -88,6 +88,8 @@ export default function TenderDashboard() {
             status: 'Active'
           };
         });
+
+        console.log('mapped', mapped);
         setTenders(mapped);
       } else {
         setFetchError(resData?.message || resData?.error || 'Failed to retrieve tenders from server.');
