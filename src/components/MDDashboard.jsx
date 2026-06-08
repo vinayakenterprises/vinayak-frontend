@@ -19,6 +19,14 @@ export default function MDDashboard() {
   const [activeTab, setActiveTab] = useState('Approval Requests');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cardData, setCardData] = useState({
+    totalTenders: 0,
+    totalActiveTenders: 0,
+    totalApprovedTenders: 0,
+    pendingFromAccountsTeam: 0,
+    completedTenders: 0,
+    rejectedTenders: 0
+  });
 
   // Modal & Actions state
   const [selectedTender, setSelectedTender] = useState(null);
@@ -32,17 +40,21 @@ export default function MDDashboard() {
     setError('');
     const token = localStorage.getItem('token') || '';
     try {
-      const [pendingRes, approvedRes] = await Promise.all([
+      const [pendingRes, approvedRes, cardsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/tenders/approval-request-tenders`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`${API_BASE_URL}/api/v1/tenders/get-approved-tenders`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE_URL}/api/v1/tenders/tender-cards-count-data`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
 
       const pendingData = await pendingRes.json().catch(() => null);
       const approvedData = await approvedRes.json().catch(() => null);
+      const cardsData = await cardsRes.json().catch(() => null);
 
       if (pendingRes.ok && pendingData?.status === 'success') {
         setPendingTenders(pendingData.data || []);
@@ -54,6 +66,19 @@ export default function MDDashboard() {
         setApprovedTenders(approvedData.data || []);
       } else {
         setError(prev => prev || approvedData?.message || 'Failed to load approved tenders.');
+      }
+
+      if (cardsRes.ok && cardsData?.status === 'success') {
+        setCardData(cardsData.data || {
+          totalTenders: 0,
+          totalActiveTenders: 0,
+          totalApprovedTenders: 0,
+          pendingFromAccountsTeam: 0,
+          completedTenders: 0,
+          rejectedTenders: 0
+        });
+      } else {
+        setError(prev => prev || cardsData?.message || 'Failed to load tender card counts.');
       }
     } catch (err) {
       console.error(err);
@@ -129,33 +154,93 @@ export default function MDDashboard() {
       )}
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Pending Card */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow">
-          <div className="space-y-1">
-            <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pending Approval</span>
-            <h3 className="text-3xl font-extrabold text-slate-950 dark:text-white">
-              {isLoading ? '...' : pendingTenders.length}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {/* Total Tenders Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 rounded-xl flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Tenders</span>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+              {isLoading ? '...' : cardData.totalTenders}
             </h3>
           </div>
-          <div className="w-12 h-12 bg-amber-50 dark:bg-amber-950/40 text-amber-500 rounded-xl flex items-center justify-center">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="w-9 h-9 bg-purple-50 dark:bg-purple-950/30 text-purple-500 rounded-lg flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Active Tenders Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 rounded-xl flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Active Tenders</span>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+              {isLoading ? '...' : cardData.totalActiveTenders}
+            </h3>
+          </div>
+          <div className="w-9 h-9 bg-sky-50 dark:bg-sky-950/30 text-sky-500 rounded-lg flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Approved Tenders Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 rounded-xl flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Approved Tenders</span>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+              {isLoading ? '...' : cardData.totalApprovedTenders}
+            </h3>
+          </div>
+          <div className="w-9 h-9 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 rounded-lg flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Pending From Accounts Tenders Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 rounded-xl flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pending From Accounts Tenders</span>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+              {isLoading ? '...' : cardData.pendingFromAccountsTeam}
+            </h3>
+          </div>
+          <div className="w-9 h-9 bg-amber-50 dark:bg-amber-950/30 text-amber-500 rounded-lg flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
         </div>
 
-        {/* Approved Card */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex items-center justify-between shadow-xs hover:shadow-md transition-shadow">
-          <div className="space-y-1">
-            <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Approved Tenders</span>
-            <h3 className="text-3xl font-extrabold text-slate-950 dark:text-white">
-              {isLoading ? '...' : approvedTenders.length}
+        {/* Completed Tenders Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 rounded-xl flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Completed Tenders</span>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+              {isLoading ? '...' : cardData.completedTenders}
             </h3>
           </div>
-          <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 rounded-xl flex items-center justify-center">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className="w-9 h-9 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-500 rounded-lg flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Rejected Tenders Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 rounded-xl flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Rejected Tenders</span>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+              {isLoading ? '...' : cardData.rejectedTenders}
+            </h3>
+          </div>
+          <div className="w-9 h-9 bg-rose-50 dark:bg-rose-950/30 text-rose-500 rounded-lg flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
         </div>
