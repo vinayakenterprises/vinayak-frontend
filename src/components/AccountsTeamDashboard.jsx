@@ -40,14 +40,28 @@ const AccountsTeamDashboard = () => {
         setSaveErrorMsg('');
         setDocSaveSuccess('');
         setDocSaveError('');
-        if (tender.payment_type && tender.payment_type.doc_url) {
-            setFormData({
-                tender_documents: [{
-                    name: tender.payment_type.type || 'DD',
-                    url: tender.payment_type.doc_url,
-                    fileName: tender.payment_type.doc_url.split('/').pop() || 'Uploaded.pdf'
-                }]
-            });
+        if (tender.payment_type) {
+            if (Array.isArray(tender.payment_type)) {
+                setFormData({
+                    tender_documents: tender.payment_type.map(d => ({
+                        name: d.type || 'DD',
+                        url: d.doc_url || '',
+                        fileName: d.doc_url ? d.doc_url.split('/').pop() : 'Uploaded.pdf'
+                    }))
+                });
+            } else if (tender.payment_type.doc_url) {
+                setFormData({
+                    tender_documents: [{
+                        name: tender.payment_type.type || 'DD',
+                        url: tender.payment_type.doc_url,
+                        fileName: tender.payment_type.doc_url.split('/').pop() || 'Uploaded.pdf'
+                    }]
+                });
+            } else {
+                setFormData({
+                    tender_documents: [{ name: 'DD', url: '' }]
+                });
+            }
         } else {
             setFormData({
                 tender_documents: [{ name: 'DD', url: '' }]
@@ -156,13 +170,12 @@ const AccountsTeamDashboard = () => {
             }
         }
 
-        const firstDoc = docs[0];
         const payload = {
             id: selectedTender.id,
-            payment_type: {
-                doc_url: firstDoc.url,
-                type: firstDoc.name
-            }
+            payment_type: docs.map(d => ({
+                doc_url: d.url,
+                type: d.name
+            }))
         };
 
         const token = localStorage.getItem('token') || '';
@@ -180,14 +193,14 @@ const AccountsTeamDashboard = () => {
 
             if (response.ok && resData?.status === 'success') {
                 setDocSaveSuccess('Document saved successfully!');
-                
+
                 // Update selectedTender in local state so the rest of the modal is sync'ed
                 setSelectedTender(prev => ({
                     ...prev,
-                    payment_type: {
-                        doc_url: firstDoc.url,
-                        type: firstDoc.name
-                    }
+                    payment_type: docs.map(d => ({
+                        doc_url: d.url,
+                        type: d.name
+                    }))
                 }));
 
                 // Refresh tenders lists
@@ -245,7 +258,7 @@ const AccountsTeamDashboard = () => {
 
             if (response.ok && resData?.status === 'success') {
                 setSaveSuccessMsg(resData?.message || 'Tender marked as complete successfully!');
-                
+
                 // Update selectedTender in local state
                 setSelectedTender(prev => ({
                     ...prev,
@@ -360,8 +373,8 @@ const AccountsTeamDashboard = () => {
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
                                 className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${activeTab === tab
-                                        ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/10'
-                                        : 'bg-slate-50 hover:bg-slate-100/80 text-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/80'
+                                    ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/10'
+                                    : 'bg-slate-50 hover:bg-slate-100/80 text-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/80'
                                     }`}
                             >
                                 {tab}
@@ -606,7 +619,7 @@ const AccountsTeamDashboard = () => {
                                     </div>
                                 </div>
 
-                                 {/* Tender Documents Upload Utility */}
+                                {/* Tender Documents Upload Utility */}
                                 <div className="border-t border-slate-100 dark:border-slate-800 pt-5 space-y-4">
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Upload Accounts Documents</h3>
