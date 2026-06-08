@@ -855,9 +855,36 @@ export default function TenderDashboard() {
   };
 
   // Delete Tender
-  const handleDeleteTender = (tenderId) => {
-    if (window.confirm(`Are you sure you want to delete tender ${tenderId}?`)) {
-      setTenders(prev => prev.filter(t => t.tender_id !== tenderId));
+  const handleDeleteTender = async (id, displayId) => {
+    const confirmed = window.confirm(`Are you sure you want to delete tender ${displayId}?`);
+    if (!confirmed) {
+      setActiveActionMenuId(null);
+      return;
+    }
+
+    const token = localStorage.getItem('token') || '';
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/delete-tender/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const resData = await response.json().catch(() => null);
+
+      if (response.ok && resData?.status === 'success') {
+        setTenders(prev => prev.filter(t => (t.id || t.tender_id) !== id));
+        alert(resData?.message || 'Tender deleted successfully');
+      } else {
+        console.error('[Delete Tender] Backend deletion failed:', resData);
+        alert(resData?.message || resData?.error || 'Failed to delete tender.');
+      }
+    } catch (err) {
+      console.error('[Delete Tender] Network error occurred:', err);
+      alert(`Network error: ${err.message || err}. Failed to connect to server.`);
+    } finally {
       setActiveActionMenuId(null);
     }
   };
@@ -1031,7 +1058,10 @@ export default function TenderDashboard() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setActiveActionMenuId(null);
+              }}
               className={`flex-1 min-w-max text-center py-2.5 px-4 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${isActive
                 ? 'bg-slate-50 text-sky-600 shadow-sm border border-slate-100'
                 : 'text-slate-500 hover:bg-slate-50/50 hover:text-slate-800'
@@ -1128,8 +1158,9 @@ export default function TenderDashboard() {
                 </tr>
               ) : (
                 filteredTenders.map(tender => {
+                  const uniqueId = tender.id || tender.tender_id;
                   return (
-                    <tr key={tender.tender_id} className="hover:bg-slate-50/85 transition-colors group">
+                    <tr key={uniqueId} className="hover:bg-slate-50/85 transition-colors group">
                       <td className="py-4 px-4 text-sm font-semibold text-slate-800 whitespace-nowrap">{tender.tender_id}</td>
                       <td className="py-4 px-4 text-sm text-slate-650 whitespace-nowrap">{tender.tender_ref_no}</td>
                       <td className="py-4 px-4 text-sm text-slate-650 whitespace-nowrap">{tender.tender_title}</td>
@@ -1168,7 +1199,7 @@ export default function TenderDashboard() {
                           {/* Ellipsis Actions button */}
                           <div className="relative">
                             <button
-                              onClick={() => setActiveActionMenuId(activeActionMenuId === tender.tender_id ? null : tender.tender_id)}
+                              onClick={() => setActiveActionMenuId(activeActionMenuId === uniqueId ? null : uniqueId)}
                               className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                             >
                               <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1176,7 +1207,7 @@ export default function TenderDashboard() {
                               </svg>
                             </button>
 
-                            {activeActionMenuId === tender.tender_id && (
+                            {activeActionMenuId === uniqueId && (
                               <>
                                 <div
                                   className="fixed inset-0 z-10"
@@ -1184,7 +1215,12 @@ export default function TenderDashboard() {
                                 />
                                 <div className="absolute right-0 mt-1 w-32 origin-top-right rounded-lg bg-white border border-slate-200 shadow-lg py-1 z-20">
                                   <button
-                                    onClick={() => handleDeleteTender(tender.tender_id)}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleDeleteTender(uniqueId, tender.tender_id);
+                                    }}
                                     className="w-full text-left px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer font-medium"
                                   >
                                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1270,7 +1306,7 @@ export default function TenderDashboard() {
                     value={formData.tender_id}
                     onChange={handleInputChange}
                     required
-                    placeholder="e.g. TNDR001-akshat"
+                    placeholder="e.g. TNDR001"
                     className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow"
                   />
                 </div>
@@ -2033,7 +2069,7 @@ export default function TenderDashboard() {
                   {activeTab === 'Submitted Tenders' && (
                     <div className="border-t border-slate-100 pt-5 space-y-4">
                       <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Completed Tender Details</h3>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Timestamps */}
                         {selectedTender.submission_expected && (
