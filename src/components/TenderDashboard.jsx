@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
 const TABS = [
@@ -6,7 +6,7 @@ const TABS = [
   { id: 'Pending MD Approval', label: 'Pending MD Approval', statusValue: 'Pending MD Approval' },
   { id: 'Rejected Tender', label: 'Rejected Tender', statusValue: 'Rejected' },
   { id: 'Shortfall Raised', label: 'Shortfall Raised', statusValue: 'Shortfall Raised' },
-  { id: 'Submitted Tenders', label: 'Submitted Tenders', statusValue: 'Submitted' },
+  { id: 'Submitted Tenders', label: 'Complete Tenders', statusValue: 'Submitted' },
   { id: 'Assigned by Accounts Team', label: 'Assigned by Accounts Team', statusValue: 'AssignedByAccountsTeam' }
 ];
 
@@ -28,7 +28,7 @@ const formatDate = (dateString) => {
       return dateString.split('T')[0];
     }
     return dateString;
-  } catch (e) {
+  } catch {
     return dateString;
   }
 };
@@ -49,6 +49,32 @@ export default function TenderDashboard() {
   const [isSendingApproval, setIsSendingApproval] = useState(false);
   const [approvalError, setApprovalError] = useState('');
   const [approvalSuccess, setApprovalSuccess] = useState('');
+
+  // Details update states (Assigned by Accounts Team tab)
+  const [detailsForm, setDetailsForm] = useState({
+    shortfall: false,
+    docs_resubmitted: [],
+    rank_file: '',
+    rank_fileName: '',
+    counter_offer: {
+      enabled: false,
+      documents: []
+    },
+    loi: '',
+    loi_fileName: '',
+    po: '',
+    po_fileName: '',
+    contract_agreement: '',
+    contract_agreement_fileName: '',
+    warranty: '',
+    warranty_fileName: '',
+    acceptance_letter: '',
+    acceptance_letter_fileName: ''
+  });
+  const [detailsUploadProgress, setDetailsUploadProgress] = useState({});
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [detailsSaveError, setDetailsSaveError] = useState('');
+  const [detailsSaveSuccess, setDetailsSaveSuccess] = useState('');
 
   // Dropdown menu state for specific row
   const [activeActionMenuId, setActiveActionMenuId] = useState(null);
@@ -71,6 +97,12 @@ export default function TenderDashboard() {
 
       if (response.ok && resData?.status === 'success') {
         const mapped = (resData.data || []).map(t => {
+          if (t.submission_actual !== undefined && t.submission_actual !== null && t.submission_actual !== '') {
+            return {
+              ...t,
+              status: 'Submitted'
+            };
+          }
           if (t.is_accounts_team_work_done && Number(t.tender_stage) === 4) {
             return {
               ...t,
@@ -245,8 +277,546 @@ export default function TenderDashboard() {
     setSelectedTender(tender);
     setApprovalError('');
     setApprovalSuccess('');
+    setDetailsSaveError('');
+    setDetailsSaveSuccess('');
+    setDetailsUploadProgress({});
+
+    setDetailsForm({
+      shortfall: !!tender.shortfall,
+      docs_resubmitted: Array.isArray(tender.docs_resubmitted)
+        ? tender.docs_resubmitted.map(d => ({
+          ...d,
+          uploading: false,
+          error: '',
+          fileName: d.name || d.fileName || d.url?.split('/').pop() || 'Uploaded.pdf'
+        }))
+        : [],
+      rank_file: tender.rank_file || '',
+      rank_fileName: tender.rank_file ? (tender.rank_file_name || tender.rank_file.split('/').pop()) : '',
+      counter_offer: (() => {
+        if (!tender.counter_offer || typeof tender.counter_offer !== 'object') {
+          return { enabled: false, documents: [] };
+        }
+        const enabled = !!tender.counter_offer.enabled;
+        let documents = [];
+        if (Array.isArray(tender.counter_offer.documents)) {
+          documents = tender.counter_offer.documents.map(d => ({
+            tag: d.tag || 'counter price',
+            url: d.url || '',
+            uploading: false,
+            error: '',
+            fileName: d.fileName || d.url?.split('/').pop() || 'Uploaded.pdf'
+          }));
+        } else if (tender.counter_offer.doc_url) {
+          // Fallback mapping from old schema format
+          documents = [{
+            tag: Array.isArray(tender.counter_offer.tags) && tender.counter_offer.tags.length > 0
+              ? tender.counter_offer.tags[0]
+              : 'counter price',
+            url: tender.counter_offer.doc_url,
+            uploading: false,
+            error: '',
+            fileName: tender.counter_offer.fileName || tender.counter_offer.doc_url.split('/').pop() || 'Uploaded.pdf'
+          }];
+        }
+        return { enabled, documents };
+      })(),
+      loi: tender.loi || '',
+      loi_fileName: tender.loi ? (tender.loi_name || tender.loi.split('/').pop()) : '',
+      po: tender.po || '',
+      po_fileName: tender.po ? (tender.po_name || tender.po.split('/').pop()) : '',
+      contract_agreement: tender.contract_agreement || '',
+      contract_agreement_fileName: tender.contract_agreement ? (tender.contract_agreement_name || tender.contract_agreement.split('/').pop()) : '',
+      warranty: tender.warranty || '',
+      warranty_fileName: tender.warranty ? (tender.warranty_name || tender.warranty.split('/').pop()) : '',
+      acceptance_letter: tender.acceptance_letter || '',
+      acceptance_letter_fileName: tender.acceptance_letter ? (tender.acceptance_letter_name || tender.acceptance_letter.split('/').pop()) : ''
+    });
+
     setIsViewModalOpen(true);
     setActiveActionMenuId(null);
+  };
+
+  // Helper for single document / rank file uploads
+  const handleDetailsSingleFileUpload = async (field, file) => {
+    if (!file) return;
+
+    // Excel vs PDF validation
+    if (field === 'rank_file') {
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext !== 'xlsx' && ext !== 'xls') {
+        setDetailsUploadProgress(prev => ({
+          ...prev,
+          [field]: { uploading: false, error: 'Only Excel files (.xlsx, .xls) are allowed.' }
+        }));
+        return;
+      }
+    } else {
+      if (file.type !== 'application/pdf') {
+        setDetailsUploadProgress(prev => ({
+          ...prev,
+          [field]: { uploading: false, error: 'Only PDF files (.pdf) are allowed.' }
+        }));
+        return;
+      }
+    }
+
+    setDetailsUploadProgress(prev => ({
+      ...prev,
+      [field]: { uploading: true, error: '', fileName: file.name }
+    }));
+
+    const token = localStorage.getItem('token') || '';
+    const uploadFormData = new FormData();
+    uploadFormData.append('pdf-file', file); // API expects 'pdf-file' key
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/upload-document`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadFormData
+      });
+
+      const resData = await response.json().catch(() => null);
+
+      if (response.ok && resData?.status === 'success') {
+        const url = resData.data.url;
+        setDetailsForm(prev => {
+          if (field === 'counter_offer') {
+            return {
+              ...prev,
+              counter_offer: {
+                ...prev.counter_offer,
+                doc_url: url,
+                fileName: file.name
+              }
+            };
+          }
+          return {
+            ...prev,
+            [field]: url,
+            [`${field}_fileName`]: file.name
+          };
+        });
+        setDetailsUploadProgress(prev => ({
+          ...prev,
+          [field]: { uploading: false, error: '', fileName: file.name }
+        }));
+      } else {
+        const error = resData?.message || resData?.error || 'Upload failed';
+        setDetailsUploadProgress(prev => ({
+          ...prev,
+          [field]: { uploading: false, error }
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+      setDetailsUploadProgress(prev => ({
+        ...prev,
+        [field]: { uploading: false, error: `Upload error: ${err.message || err}` }
+      }));
+    }
+  };
+
+  // Resubmitted documents handlers (Shortfall)
+  const handleDocsResubmittedChange = (index, field, value) => {
+    const updatedDocs = [...detailsForm.docs_resubmitted];
+    updatedDocs[index][field] = value;
+    setDetailsForm(prev => ({
+      ...prev,
+      docs_resubmitted: updatedDocs
+    }));
+  };
+
+  const addDocsResubmittedRow = () => {
+    setDetailsForm(prev => ({
+      ...prev,
+      docs_resubmitted: [...prev.docs_resubmitted, { name: 'Spec', url: '', uploading: false, error: '', fileName: '' }]
+    }));
+  };
+
+  const removeDocsResubmittedRow = (index) => {
+    const updatedDocs = detailsForm.docs_resubmitted.filter((_, i) => i !== index);
+    setDetailsForm(prev => ({
+      ...prev,
+      docs_resubmitted: updatedDocs
+    }));
+  };
+
+  const handleDocsResubmittedUpload = async (index, file) => {
+    if (!file) return;
+
+    // Check PDF only
+    if (file.type !== 'application/pdf') {
+      const docs = [...detailsForm.docs_resubmitted];
+      docs[index].error = 'Only PDF files (.pdf) are allowed.';
+      setDetailsForm(prev => ({ ...prev, docs_resubmitted: docs }));
+      return;
+    }
+
+    const updatedDocs = [...detailsForm.docs_resubmitted];
+    updatedDocs[index].uploading = true;
+    updatedDocs[index].error = '';
+    updatedDocs[index].fileName = file.name;
+    setDetailsForm(prev => ({
+      ...prev,
+      docs_resubmitted: updatedDocs
+    }));
+
+    const token = localStorage.getItem('token') || '';
+    const uploadFormData = new FormData();
+    uploadFormData.append('pdf-file', file);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/upload-document`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadFormData
+      });
+
+      const resData = await response.json().catch(() => null);
+
+      if (response.ok && resData?.status === 'success') {
+        const url = resData.data.url;
+        setDetailsForm(prev => {
+          const docs = [...prev.docs_resubmitted];
+          docs[index].url = url;
+          docs[index].uploading = false;
+          docs[index].error = '';
+          return { ...prev, docs_resubmitted: docs };
+        });
+      } else {
+        const error = resData?.message || resData?.error || 'Upload failed';
+        setDetailsForm(prev => {
+          const docs = [...prev.docs_resubmitted];
+          docs[index].uploading = false;
+          docs[index].error = error;
+          return { ...prev, docs_resubmitted: docs };
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setDetailsForm(prev => {
+        const docs = [...prev.docs_resubmitted];
+        docs[index].uploading = false;
+        docs[index].error = `Upload error: ${err.message || err}`;
+        return { ...prev, docs_resubmitted: docs };
+      });
+    }
+  };
+
+  // Counter Offer dynamic documents list handlers
+  const handleCounterOfferDocChange = (index, field, value) => {
+    const updatedDocs = [...detailsForm.counter_offer.documents];
+    updatedDocs[index][field] = value;
+    setDetailsForm(prev => ({
+      ...prev,
+      counter_offer: {
+        ...prev.counter_offer,
+        documents: updatedDocs
+      }
+    }));
+  };
+
+  const addCounterOfferDocRow = () => {
+    setDetailsForm(prev => ({
+      ...prev,
+      counter_offer: {
+        ...prev.counter_offer,
+        documents: [...prev.counter_offer.documents, { tag: 'counter price', url: '', uploading: false, error: '', fileName: '' }]
+      }
+    }));
+  };
+
+  const removeCounterOfferDocRow = (index) => {
+    const updatedDocs = detailsForm.counter_offer.documents.filter((_, i) => i !== index);
+    setDetailsForm(prev => ({
+      ...prev,
+      counter_offer: {
+        ...prev.counter_offer,
+        documents: updatedDocs
+      }
+    }));
+  };
+
+  const handleCounterOfferDocUpload = async (index, file) => {
+    if (!file) return;
+
+    // Check PDF only
+    if (file.type !== 'application/pdf') {
+      const docs = [...detailsForm.counter_offer.documents];
+      docs[index].error = 'Only PDF files (.pdf) are allowed.';
+      setDetailsForm(prev => ({
+        ...prev,
+        counter_offer: {
+          ...prev.counter_offer,
+          documents: docs
+        }
+      }));
+      return;
+    }
+
+    const updatedDocs = [...detailsForm.counter_offer.documents];
+    updatedDocs[index].uploading = true;
+    updatedDocs[index].error = '';
+    updatedDocs[index].fileName = file.name;
+    setDetailsForm(prev => ({
+      ...prev,
+      counter_offer: {
+        ...prev.counter_offer,
+        documents: updatedDocs
+      }
+    }));
+
+    const token = localStorage.getItem('token') || '';
+    const uploadFormData = new FormData();
+    uploadFormData.append('pdf-file', file);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/upload-document`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadFormData
+      });
+
+      const resData = await response.json().catch(() => null);
+
+      if (response.ok && resData?.status === 'success') {
+        const url = resData.data.url;
+        setDetailsForm(prev => {
+          const docs = [...prev.counter_offer.documents];
+          docs[index].url = url;
+          docs[index].uploading = false;
+          docs[index].error = '';
+          return {
+            ...prev,
+            counter_offer: {
+              ...prev.counter_offer,
+              documents: docs
+            }
+          };
+        });
+      } else {
+        const error = resData?.message || resData?.error || 'Upload failed';
+        setDetailsForm(prev => {
+          const docs = [...prev.counter_offer.documents];
+          docs[index].uploading = false;
+          docs[index].error = error;
+          return {
+            ...prev,
+            counter_offer: {
+              ...prev.counter_offer,
+              documents: docs
+            }
+          };
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setDetailsForm(prev => {
+        const docs = [...prev.counter_offer.documents];
+        docs[index].uploading = false;
+        docs[index].error = `Upload error: ${err.message || err}`;
+        return {
+          ...prev,
+          counter_offer: {
+            ...prev.counter_offer,
+            documents: docs
+          }
+        };
+      });
+    }
+  };
+
+  // Save/Update Details to backend
+  const handleSaveTenderDetails = async (isMarkComplete = false) => {
+    setIsSavingDetails(true);
+    setDetailsSaveError('');
+    setDetailsSaveSuccess('');
+
+    // Check if any files are still uploading
+    const uploadingDocs = detailsForm.docs_resubmitted.some(d => d.uploading);
+    const uploadingCounterOffer = detailsForm.counter_offer.documents.some(d => d.uploading);
+    const uploadingSingle = Object.values(detailsUploadProgress).some(p => p.uploading);
+    if (uploadingDocs || uploadingCounterOffer || uploadingSingle) {
+      setDetailsSaveError('Please wait for all file uploads to complete before saving.');
+      setIsSavingDetails(false);
+      return;
+    }
+
+    const currentTimestamp = new Date();
+    const payload = {
+      id: selectedTender.id,
+      shortfall: detailsForm.shortfall,
+      docs_resubmitted: detailsForm.shortfall
+        ? detailsForm.docs_resubmitted.map(d => ({ name: d.name, url: d.url }))
+        : [],
+      rank_file: detailsForm.rank_file || null,
+      counter_offer: {
+        enabled: detailsForm.counter_offer.enabled,
+        documents: detailsForm.counter_offer.enabled
+          ? detailsForm.counter_offer.documents.map(d => ({ tag: d.tag, url: d.url }))
+          : []
+      },
+      loi: detailsForm.loi || null,
+      po: detailsForm.po || null,
+      contract_agreement: detailsForm.contract_agreement || null,
+      warranty: detailsForm.warranty || null,
+      acceptance_letter: detailsForm.acceptance_letter || null,
+      ...(isMarkComplete ? { submission_actual: currentTimestamp } : {})
+    };
+
+    const token = localStorage.getItem('token') || '';
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/update-tender-details`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const resData = await response.json().catch(() => null);
+
+      if (response.ok && resData?.status === 'success') {
+        const successMsg = isMarkComplete
+          ? 'Tender details updated and marked as complete successfully!'
+          : 'Tender details updated successfully!';
+        setDetailsSaveSuccess(successMsg);
+
+        // Refresh local selectedTender so any display in the modal gets synced
+        setSelectedTender(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            shortfall: payload.shortfall,
+            docs_resubmitted: payload.docs_resubmitted,
+            rank_file: payload.rank_file,
+            counter_offer: payload.counter_offer,
+            loi: payload.loi,
+            po: payload.po,
+            contract_agreement: payload.contract_agreement,
+            warranty: payload.warranty,
+            acceptance_letter: payload.acceptance_letter,
+            ...(isMarkComplete ? { submission_actual: currentTimestamp } : {})
+          };
+        });
+
+        // Reload the main dashboard list
+        await loadTenders();
+
+        setTimeout(() => {
+          setDetailsSaveSuccess('');
+        }, 3000);
+      } else {
+        setDetailsSaveError(resData?.message || resData?.error || 'Failed to update tender details.');
+      }
+    } catch (err) {
+      console.error(err);
+      setDetailsSaveError(`Network error: ${err.message || err}. Could not connect to API server.`);
+    } finally {
+      setIsSavingDetails(false);
+    }
+  };
+
+  const isTenderCompleted = selectedTender?.submission_actual != null;
+
+  const renderSingleFileUploadDetails = (field, label, accept = ".pdf") => {
+    const fileUrl = detailsForm[field];
+    const fileName = detailsForm[`${field}_fileName`];
+    const progress = detailsUploadProgress[field] || {};
+    const isCompleted = isTenderCompleted;
+
+    return (
+      <div className="space-y-1.5">
+        <label className="block text-xs font-bold text-slate-705 uppercase tracking-wide">
+          {label}
+        </label>
+        <div className="flex items-center gap-2">
+          {progress.uploading ? (
+            <div className="flex-1 flex items-center gap-1.5 py-2 px-3 border border-slate-200 rounded-lg text-xs text-slate-500 font-medium bg-slate-50/50">
+              <svg className="animate-spin h-3.5 w-3.5 text-sky-500" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Uploading...
+            </div>
+          ) : fileUrl ? (
+            <div className="flex-1 flex items-center justify-between bg-emerald-50/70 border border-emerald-100 rounded-lg px-3 py-1.5 text-xs text-emerald-800 font-medium truncate">
+              <span className="truncate flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                {fileName || 'Uploaded file'}
+              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] text-sky-500 hover:text-sky-655 font-bold uppercase"
+                >
+                  View
+                </a>
+                {!isCompleted && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDetailsForm(prev => ({ ...prev, [field]: '', [`${field}_fileName`]: '' }));
+                    }}
+                    className="text-rose-500 hover:text-rose-600 p-0.5 rounded cursor-pointer"
+                    title="Remove file"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 text-slate-400 italic text-xs py-2 px-3 border border-slate-150 border-dashed rounded-lg bg-slate-50/20 select-none">
+              No file uploaded
+            </div>
+          )}
+
+          {!progress.uploading && !isCompleted && (
+            <div>
+              <label
+                htmlFor={`details-upload-${field}`}
+                className="cursor-pointer bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-sky-600 hover:bg-sky-50/50 hover:border-sky-300 transition-all font-semibold shadow-xs flex items-center gap-1 shrink-0 whitespace-nowrap h-[34px]"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                {fileUrl ? 'Replace' : 'Upload'}
+              </label>
+              <input
+                id={`details-upload-${field}`}
+                type="file"
+                accept={accept}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleDetailsSingleFileUpload(field, file);
+                }}
+              />
+            </div>
+          )}
+        </div>
+        {progress.error && (
+          <p className="text-[10px] text-rose-500 font-semibold mt-0.5">{progress.error}</p>
+        )}
+      </div>
+    );
   };
 
   // Send Tender for Approval
@@ -330,7 +900,7 @@ export default function TenderDashboard() {
       // Validate S3 URL format
       try {
         new URL(doc.url);
-      } catch (_) {
+      } catch {
         setSubmitError(`Document #${i + 1} S3 URL is not valid.`);
         setIsSubmitting(false);
         return;
@@ -558,30 +1128,6 @@ export default function TenderDashboard() {
                 </tr>
               ) : (
                 filteredTenders.map(tender => {
-                  // Style badge according to status value
-                  let badgeClass = 'bg-slate-50 text-slate-600 border-slate-100';
-                  let dotClass = 'bg-slate-400';
-
-                  if (tender.status === 'Active') {
-                    badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
-                    dotClass = 'bg-emerald-500';
-                  } else if (tender.status === 'Pending MD Approval') {
-                    badgeClass = 'bg-amber-50 text-amber-700 border-amber-100';
-                    dotClass = 'bg-amber-500';
-                  } else if (tender.status === 'Rejected') {
-                    badgeClass = 'bg-rose-50 text-rose-700 border-rose-100';
-                    dotClass = 'bg-rose-500';
-                  } else if (tender.status === 'Shortfall Raised') {
-                    badgeClass = 'bg-orange-50 text-orange-700 border-orange-100';
-                    dotClass = 'bg-orange-500';
-                  } else if (tender.status === 'Submitted') {
-                    badgeClass = 'bg-sky-50 text-sky-700 border-sky-100';
-                    dotClass = 'bg-sky-500';
-                  } else if (tender.status === 'AssignedByAccountsTeam') {
-                    badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-100';
-                    dotClass = 'bg-indigo-500';
-                  }
-
                   return (
                     <tr key={tender.tender_id} className="hover:bg-slate-50/85 transition-colors group">
                       <td className="py-4 px-4 text-sm font-semibold text-slate-800 whitespace-nowrap">{tender.tender_id}</td>
@@ -1030,7 +1576,7 @@ export default function TenderDashboard() {
       {/* View Tender Details Modal */}
       {isViewModalOpen && selectedTender && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col scale-in duration-150">
+          <div className={`bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${(activeTab === 'Assigned by Accounts Team' || activeTab === 'Submitted Tenders') ? 'max-w-2xl' : 'max-w-lg'} max-h-[90vh] overflow-hidden flex flex-col scale-in duration-150`}>
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-900">Tender Details</h2>
@@ -1064,6 +1610,24 @@ export default function TenderDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <span className="font-semibold text-xs">{approvalSuccess}</span>
+                </div>
+              )}
+
+              {detailsSaveError && (
+                <div className="bg-rose-50 border border-rose-100 text-rose-800 text-xs p-4 rounded-xl flex items-center gap-2.5 shadow-sm animate-fadeIn">
+                  <svg className="w-5 h-5 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span className="font-semibold">{detailsSaveError}</span>
+                </div>
+              )}
+
+              {detailsSaveSuccess && (
+                <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs p-4 rounded-xl flex items-center gap-2.5 shadow-sm animate-fadeIn">
+                  <svg className="w-5 h-5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-semibold">{detailsSaveSuccess}</span>
                 </div>
               )}
 
@@ -1147,37 +1711,524 @@ export default function TenderDashboard() {
                       <p className="text-xs text-slate-500 italic">No documents attached.</p>
                     )}
                   </div>
+                  {/* Assigned by Accounts Team update form fields */}
+                  {activeTab === 'Assigned by Accounts Team' && (
+                    <div className="border-t border-slate-100 pt-5 space-y-4">
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Update Assigned Tender Details</h3>
+
+                      <div className="space-y-4">
+                        {/* Shortfall Toggle */}
+                        <div className="space-y-3 p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
+                          <div className="flex items-center justify-between">
+                            <label className="relative inline-flex items-center cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={detailsForm.shortfall}
+                                onChange={(e) => setDetailsForm(prev => ({ ...prev, shortfall: e.target.checked }))}
+                                disabled={isTenderCompleted}
+                                className="sr-only peer"
+                              />
+                              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-75"></div>
+                              <span className="ms-3 text-sm font-semibold text-slate-700">Shortfall</span>
+                            </label>
+                          </div>
+
+                          {detailsForm.shortfall && (
+                            <div className="space-y-3 border-t border-slate-200/50 pt-3">
+                              <div className="flex items-center justify-between">
+                                <label className="block text-[10px] font-bold text-slate-550 uppercase">Resubmitted Documents</label>
+                                {!isTenderCompleted && (
+                                  <button
+                                    type="button"
+                                    onClick={addDocsResubmittedRow}
+                                    className="text-xs font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <svg className="w-3.5 h-3.5 stroke-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Add Document
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="space-y-3">
+                                {detailsForm.docs_resubmitted.map((doc, idx) => (
+                                  <div key={idx} className="flex gap-3 items-end bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                                    <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      {/* Document Name Dropdown */}
+                                      <div>
+                                        <label className="block text-[10px] font-bold text-slate-505 uppercase mb-1">Document Name <span className="text-rose-500">*</span></label>
+                                        <select
+                                          value={doc.name}
+                                          onChange={(e) => handleDocsResubmittedChange(idx, 'name', e.target.value)}
+                                          required
+                                          disabled={isTenderCompleted}
+                                          className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded text-xs focus:outline-none focus:border-sky-505 text-slate-800"
+                                        >
+                                          {DOCUMENT_NAMES.map(name => (
+                                            <option key={name} value={name}>{name}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+
+                                      {/* Document PDF Upload */}
+                                      <div>
+                                        <label className="block text-[10px] font-bold text-slate-505 uppercase mb-1">Document PDF <span className="text-rose-500">*</span></label>
+                                        <div className="flex items-center gap-2">
+                                          {doc.uploading ? (
+                                            <div className="flex-1 flex items-center gap-1.5 py-1.5 text-xs text-slate-500 font-medium">
+                                              <svg className="animate-spin h-3.5 w-3.5 text-sky-500" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                              </svg>
+                                              Uploading PDF...
+                                            </div>
+                                          ) : doc.url ? (
+                                            <div className="flex-1 flex items-center justify-between bg-white border border-emerald-100 rounded px-2.5 py-1.5 text-xs text-emerald-700 font-medium truncate">
+                                              <span className="truncate flex items-center gap-1">
+                                                <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                {doc.fileName || 'Uploaded.pdf'}
+                                              </span>
+                                              <a
+                                                href={doc.url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-[10px] text-sky-500 hover:text-sky-600 font-bold ml-2 shrink-0 uppercase"
+                                              >
+                                                View
+                                              </a>
+                                            </div>
+                                          ) : (
+                                            <div className="flex-1 text-slate-400 italic text-xs py-1.5">No file uploaded</div>
+                                          )}
+
+                                          {!doc.uploading && !isTenderCompleted && (
+                                            <div>
+                                              <label
+                                                htmlFor={`details-docs-resubmitted-upload-${idx}`}
+                                                className="cursor-pointer bg-white px-3 py-1.5 border border-slate-200 rounded text-xs text-sky-600 hover:bg-sky-50/50 hover:border-sky-300 transition-all font-semibold shadow-xs flex items-center gap-1 shrink-0"
+                                              >
+                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                                </svg>
+                                                {doc.url ? 'Replace' : 'Upload'}
+                                              </label>
+                                              <input
+                                                id={`details-docs-resubmitted-upload-${idx}`}
+                                                type="file"
+                                                accept=".pdf"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                  const file = e.target.files?.[0];
+                                                  if (file) handleDocsResubmittedUpload(idx, file);
+                                                }}
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+                                        {doc.error && (
+                                          <p className="text-[10px] text-rose-500 font-medium mt-1">{doc.error}</p>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {!isTenderCompleted && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeDocsResubmittedRow(idx)}
+                                        className="p-1.5 bg-white border border-slate-200 rounded text-rose-500 hover:bg-rose-50 hover:border-rose-200 transition-colors cursor-pointer mb-0.5"
+                                        title="Delete Row"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                                {detailsForm.docs_resubmitted.length === 0 && (
+                                  <p className="text-xs text-slate-450 italic text-center py-2">No documents added. Click "Add Document" to start uploading shortfall files.</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Upload Rank (Excel) */}
+                        <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
+                          {renderSingleFileUploadDetails('rank_file', 'Upload Rank (Excel File)', '.xlsx,.xls')}
+                        </div>
+
+                        {/* Counter Offer Toggle */}
+                        <div className="space-y-3 p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
+                          <div className="flex items-center justify-between">
+                            <label className="relative inline-flex items-center cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={detailsForm.counter_offer.enabled}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setDetailsForm(prev => {
+                                    // Prepopulate with a default row if enabling and currently empty
+                                    const existingDocs = prev.counter_offer.documents || [];
+                                    const documents = (checked && existingDocs.length === 0)
+                                      ? [{ tag: 'counter price', url: '', uploading: false, error: '', fileName: '' }]
+                                      : existingDocs;
+                                    return {
+                                      ...prev,
+                                      counter_offer: {
+                                        enabled: checked,
+                                        documents
+                                      }
+                                    };
+                                  });
+                                }}
+                                disabled={isTenderCompleted}
+                                className="sr-only peer"
+                              />
+                              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-75"></div>
+                              <span className="ms-3 text-sm font-semibold text-slate-700">Counter Offer</span>
+                            </label>
+
+                            {detailsForm.counter_offer.enabled && !isTenderCompleted && (
+                              <button
+                                type="button"
+                                onClick={addCounterOfferDocRow}
+                                className="text-xs font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
+                              >
+                                <svg className="w-3.5 h-3.5 stroke-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Add Document
+                              </button>
+                            )}
+                          </div>
+
+                          {detailsForm.counter_offer.enabled && (
+                            <div className="space-y-3 border-t border-slate-200/50 pt-3">
+                              <div className="space-y-3">
+                                {detailsForm.counter_offer.documents.map((doc, idx) => (
+                                  <div key={idx} className="flex gap-3 items-end bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                                    <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      {/* Document Tag / Name Input */}
+                                      <div>
+                                        <label className="block text-[10px] font-bold text-slate-505 uppercase mb-1">Tag / Document Label <span className="text-rose-500">*</span></label>
+                                        <input
+                                          type="text"
+                                          value={doc.tag}
+                                          onChange={(e) => handleCounterOfferDocChange(idx, 'tag', e.target.value)}
+                                          required
+                                          disabled={isTenderCompleted}
+                                          placeholder="e.g. counter price"
+                                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:border-sky-505 bg-white text-slate-800 disabled:bg-slate-50 disabled:text-slate-550"
+                                        />
+                                      </div>
+
+                                      {/* Document PDF Upload */}
+                                      <div>
+                                        <label className="block text-[10px] font-bold text-slate-505 uppercase mb-1">Document PDF <span className="text-rose-500">*</span></label>
+                                        <div className="flex items-center gap-2">
+                                          {doc.uploading ? (
+                                            <div className="flex-1 flex items-center gap-1.5 py-1.5 text-xs text-slate-500 font-medium">
+                                              <svg className="animate-spin h-3.5 w-3.5 text-sky-500" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                              </svg>
+                                              Uploading PDF...
+                                            </div>
+                                          ) : doc.url ? (
+                                            <div className="flex-1 flex items-center justify-between bg-white border border-emerald-100 rounded px-2.5 py-1.5 text-xs text-emerald-700 font-medium truncate">
+                                              <span className="truncate flex items-center gap-1">
+                                                <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                {doc.fileName || 'Uploaded.pdf'}
+                                              </span>
+                                              <a
+                                                href={doc.url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-[10px] text-sky-500 hover:text-sky-600 font-bold ml-2 shrink-0 uppercase"
+                                              >
+                                                View
+                                              </a>
+                                            </div>
+                                          ) : (
+                                            <div className="flex-1 text-slate-400 italic text-xs py-1.5">No file uploaded</div>
+                                          )}
+
+                                          {!doc.uploading && !isTenderCompleted && (
+                                            <div>
+                                              <label
+                                                htmlFor={`details-counter-offer-upload-${idx}`}
+                                                className="cursor-pointer bg-white px-3 py-1.5 border border-slate-200 rounded text-xs text-sky-600 hover:bg-sky-50/50 hover:border-sky-300 transition-all font-semibold shadow-xs flex items-center gap-1 shrink-0 whitespace-nowrap"
+                                              >
+                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                                </svg>
+                                                {doc.url ? 'Replace' : 'Upload'}
+                                              </label>
+                                              <input
+                                                id={`details-counter-offer-upload-${idx}`}
+                                                type="file"
+                                                accept=".pdf"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                  const file = e.target.files?.[0];
+                                                  if (file) handleCounterOfferDocUpload(idx, file);
+                                                }}
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+                                        {doc.error && (
+                                          <p className="text-[10px] text-rose-500 font-medium mt-1">{doc.error}</p>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {!isTenderCompleted && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeCounterOfferDocRow(idx)}
+                                        className="p-1.5 bg-white border border-slate-200 rounded text-rose-500 hover:bg-rose-50 hover:border-rose-200 transition-colors cursor-pointer mb-0.5"
+                                        title="Delete Row"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                                {detailsForm.counter_offer.documents.length === 0 && (
+                                  <p className="text-xs text-slate-450 italic text-center py-2">No documents added. Click "Add Document" to start uploading counter offer files.</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* LOI, PO, Contract Agreement, Warranty, Acceptance Letter */}
+                        <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-4">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Legal & Execution Documents (PDF)</h4>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {renderSingleFileUploadDetails('loi', 'LOI (Letter of Intent)', '.pdf')}
+                            {renderSingleFileUploadDetails('po', 'PO (Purchase Order)', '.pdf')}
+                            <div className="md:col-span-2">
+                              {renderSingleFileUploadDetails('contract_agreement', 'Contract Agreement', '.pdf')}
+                            </div>
+                            {renderSingleFileUploadDetails('warranty', 'Warranty', '.pdf')}
+                            {renderSingleFileUploadDetails('acceptance_letter', 'Acceptance Letter', '.pdf')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Complete Tenders tab read-only view details */}
+                  {activeTab === 'Submitted Tenders' && (
+                    <div className="border-t border-slate-100 pt-5 space-y-4">
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Completed Tender Details</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Timestamps */}
+                        {selectedTender.submission_expected && (
+                          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase">Submission Expected</span>
+                            <span className="text-xs font-semibold text-slate-700">{formatDate(selectedTender.submission_expected)}</span>
+                          </div>
+                        )}
+                        {selectedTender.submission_actual && (
+                          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual Submission</span>
+                            <span className="text-xs font-semibold text-slate-700">{new Date(selectedTender.submission_actual).toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Shortfall Details */}
+                        {selectedTender.shortfall ? (
+                          <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-700">Shortfall Status</span>
+                              <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-full">Raised</span>
+                            </div>
+                            <div className="space-y-2">
+                              <span className="block text-[10px] font-bold text-slate-400 uppercase">Resubmitted Documents</span>
+                              {selectedTender.docs_resubmitted && selectedTender.docs_resubmitted.length > 0 ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {selectedTender.docs_resubmitted.map((doc, idx) => (
+                                    <div key={idx} className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                      <span className="truncate pr-2">{doc.name}</span>
+                                      <a href={doc.url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">No shortfall documents uploaded.</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* Rank File */}
+                        {selectedTender.rank_file ? (
+                          <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl flex items-center justify-between">
+                            <div>
+                              <span className="block text-[10px] font-bold text-slate-400 uppercase">Tender Rank File</span>
+                              <span className="text-xs font-semibold text-slate-700">{selectedTender.rank_file.split('/').pop() || 'Rank File.xlsx'}</span>
+                            </div>
+                            <a href={selectedTender.rank_file} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-xs">Download Excel</a>
+                          </div>
+                        ) : null}
+
+                        {/* Counter Offer Details */}
+                        {selectedTender.counter_offer?.enabled ? (
+                          <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-700">Counter Offer Status</span>
+                              <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full">Enabled</span>
+                            </div>
+                            <div className="space-y-2">
+                              <span className="block text-[10px] font-bold text-slate-400 uppercase">Counter Offer Documents</span>
+                              {selectedTender.counter_offer.documents && selectedTender.counter_offer.documents.length > 0 ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {selectedTender.counter_offer.documents.map((doc, idx) => (
+                                    <div key={idx} className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                      <span className="truncate pr-2 font-semibold text-slate-600">{doc.tag}</span>
+                                      <a href={doc.url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">No counter offer documents uploaded.</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* Legal & Execution Documents */}
+                        {(selectedTender.loi || selectedTender.po || selectedTender.contract_agreement || selectedTender.warranty || selectedTender.acceptance_letter) ? (
+                          <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
+                            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Legal & Execution Documents</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {selectedTender.loi && (
+                                <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                  <span className="truncate pr-2">LOI</span>
+                                  <a href={selectedTender.loi} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                </div>
+                              )}
+                              {selectedTender.po && (
+                                <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                  <span className="truncate pr-2">PO</span>
+                                  <a href={selectedTender.po} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                </div>
+                              )}
+                              {selectedTender.contract_agreement && (
+                                <div className="col-span-1 sm:col-span-2 flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                  <span className="truncate pr-2">Contract Agreement</span>
+                                  <a href={selectedTender.contract_agreement} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                </div>
+                              )}
+                              {selectedTender.warranty && (
+                                <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                  <span className="truncate pr-2">Warranty</span>
+                                  <a href={selectedTender.warranty} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                </div>
+                              )}
+                              {selectedTender.acceptance_letter && (
+                                <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                  <span className="truncate pr-2">Acceptance Letter</span>
+                                  <a href={selectedTender.acceptance_letter} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Modal Footer */}
-            <div className="border-t border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center">
-              <button
-                onClick={() => handleSendForApproval(selectedTender)}
-                disabled={isSendingApproval || selectedTender?.send_for_approaval}
-                className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-400 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-              >
-                {isSendingApproval ? (
-                  <>
-                    <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Sending...
-                  </>
-                ) : selectedTender?.send_for_approaval ? (
-                  'Already Sent For Approval'
-                ) : (
-                  'Send For Approval'
-                )}
-              </button>
-              <button
-                onClick={() => setIsViewModalOpen(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-              >
-                Close Window
-              </button>
+              {/* Modal Footer */}
+              <div className="border-t border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center gap-2">
+                <div className="flex gap-2">
+                  {activeTab === 'Assigned by Accounts Team' ? (
+                    <>
+                      <button
+                        onClick={() => handleSaveTenderDetails(false)}
+                        disabled={isSavingDetails || isTenderCompleted || Object.values(detailsUploadProgress).some(p => p.uploading) || detailsForm.docs_resubmitted.some(d => d.uploading) || detailsForm.counter_offer.documents.some(d => d.uploading)}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-450 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                      >
+                        {isSavingDetails ? (
+                          <>
+                            <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Saving...
+                          </>
+                        ) : (
+                          'Save Tender Details'
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => handleSaveTenderDetails(true)}
+                        disabled={isSavingDetails || isTenderCompleted || Object.values(detailsUploadProgress).some(p => p.uploading) || detailsForm.docs_resubmitted.some(d => d.uploading) || detailsForm.counter_offer.documents.some(d => d.uploading)}
+                        className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-400 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                      >
+                        {isSavingDetails ? (
+                          <>
+                            <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Marking Complete...
+                          </>
+                        ) : isTenderCompleted ? (
+                          'Completed'
+                        ) : (
+                          'Mark As Complete'
+                        )}
+                      </button>
+                    </>
+                  ) : activeTab === 'Submitted Tenders' ? null : (
+                    <button
+                      onClick={() => handleSendForApproval(selectedTender)}
+                      disabled={isSendingApproval || selectedTender?.send_for_approaval}
+                      className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-400 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      {isSendingApproval ? (
+                        <>
+                          <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Sending...
+                        </>
+                      ) : selectedTender?.send_for_approaval ? (
+                        'Already Sent For Approval'
+                      ) : (
+                        'Send For Approval'
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Close Window
+                </button>
+              </div>
             </div>
           </div>
         </div>
