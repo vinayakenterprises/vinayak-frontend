@@ -16,6 +16,7 @@ const formatDate = (dateString) => {
 export default function MDDashboard() {
   const [pendingTenders, setPendingTenders] = useState([]);
   const [approvedTenders, setApprovedTenders] = useState([]);
+  const [rejectedTenders, setRejectedTenders] = useState([]);
   const [activeTab, setActiveTab] = useState('Approval Requests');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,7 +42,7 @@ export default function MDDashboard() {
     setError('');
     const token = localStorage.getItem('token') || '';
     try {
-      const [pendingRes, approvedRes, cardsRes] = await Promise.all([
+      const [pendingRes, approvedRes, cardsRes, rejectedRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/tenders/approval-request-tenders`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
@@ -50,12 +51,16 @@ export default function MDDashboard() {
         }),
         fetch(`${API_BASE_URL}/api/v1/tenders/tender-cards-count-data`, {
           headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE_URL}/api/v1/tenders/get-rejected-tenders`, {
+          headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
 
       const pendingData = await pendingRes.json().catch(() => null);
       const approvedData = await approvedRes.json().catch(() => null);
       const cardsData = await cardsRes.json().catch(() => null);
+      const rejectedData = await rejectedRes.json().catch(() => null);
 
       if (pendingRes.ok && pendingData?.status === 'success') {
         setPendingTenders(pendingData.data || []);
@@ -67,6 +72,12 @@ export default function MDDashboard() {
         setApprovedTenders(approvedData.data || []);
       } else {
         setError(prev => prev || approvedData?.message || 'Failed to load approved tenders.');
+      }
+
+      if (rejectedRes.ok && rejectedData?.status === 'success') {
+        setRejectedTenders(rejectedData.data || []);
+      } else {
+        setError(prev => prev || rejectedData?.message || 'Failed to load rejected tenders.');
       }
 
       if (cardsRes.ok && cardsData?.status === 'success') {
@@ -147,7 +158,12 @@ export default function MDDashboard() {
     setSelectedTender(tender);
   };
 
-  const activeTenders = activeTab === 'Approval Requests' ? pendingTenders : approvedTenders;
+  const activeTenders =
+    activeTab === 'Approval Requests'
+      ? pendingTenders
+      : activeTab === 'Approved Tenders'
+        ? approvedTenders
+        : rejectedTenders;
 
   return (
     <div className="space-y-6">
@@ -268,7 +284,7 @@ export default function MDDashboard() {
         {/* Tab Header */}
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
           <div className="flex gap-2">
-            {['Approval Requests', 'Approved Tenders'].map((tab) => (
+            {['Approval Requests', 'Approved Tenders', 'Rejected Tenders'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -480,11 +496,18 @@ export default function MDDashboard() {
                     <h3 className="text-lg font-bold text-slate-950 dark:text-white">{selectedTender.tender_title}</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase mt-0.5">{selectedTender.tender_organization}</p>
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${selectedTender.approved
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900'
-                    : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
-                    }`}>
-                    {selectedTender.approved ? 'Approved' : 'Pending Approval'}
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                    activeTab === 'Approved Tenders'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900'
+                      : activeTab === 'Rejected Tenders'
+                        ? 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900'
+                        : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
+                  }`}>
+                    {activeTab === 'Approved Tenders'
+                      ? 'Approved'
+                      : activeTab === 'Rejected Tenders'
+                        ? 'Rejected'
+                        : 'Pending Approval'}
                   </span>
                 </div>
 
@@ -567,9 +590,9 @@ export default function MDDashboard() {
 
             {/* Modal Footer */}
             <div className="border-t border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
-              {!selectedTender.approved ? (
+              {activeTab === 'Approval Requests' ? (
                 <button
-                  onClick={() => handleApproveTender(selectedTender.id)}
+                  onClick={() => handleApproveTender(selectedTender.id, true)}
                   disabled={isApproving}
                   className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-450 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                 >
@@ -590,12 +613,19 @@ export default function MDDashboard() {
                     </>
                   )}
                 </button>
-              ) : (
+              ) : activeTab === 'Approved Tenders' ? (
                 <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold">
                   <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   Already Approved
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-rose-600 text-xs font-bold">
+                  <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Rejected
                 </div>
               )}
               <button
