@@ -1216,7 +1216,38 @@ export default function TendersListView() {
       {/* Add / Edit Tender Modal */}
       {(isAddModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col scale-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col scale-in duration-150 relative">
+            {/* Submission Loader Overlay */}
+            {isSubmitting && (
+              <div className="absolute inset-0 z-30 bg-white/80 flex flex-col items-center justify-center space-y-4 animate-fade-in backdrop-blur-3xs">
+                <div className="flex items-center justify-center p-3 bg-sky-50 text-sky-600 rounded-2xl shadow-sm border border-sky-100/50">
+                  <svg className="animate-spin h-8 w-8 text-sky-500" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                </div>
+                <div className="text-center space-y-1">
+                  <h3 className="text-sm font-bold text-slate-800">Saving Tender Details</h3>
+                  <p className="text-xs text-slate-500">Please wait while we publish the changes to the database...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Success Status Overlay */}
+            {submitSuccess && (
+              <div className="absolute inset-0 z-30 bg-white/95 flex flex-col items-center justify-center space-y-4 animate-fade-in">
+                <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center border border-emerald-100 shadow-sm">
+                  <svg className="w-8 h-8 stroke-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="text-center space-y-1">
+                  <h3 className="text-sm font-bold text-slate-800">{submitSuccess}</h3>
+                  <p className="text-xs text-slate-400">Closing modal window...</p>
+                </div>
+              </div>
+            )}
+
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-900">
@@ -1247,15 +1278,6 @@ export default function TendersListView() {
                     <span className="font-semibold">Submission Error</span>
                   </div>
                   <p className="text-xs">{submitError}</p>
-                </div>
-              )}
-
-              {submitSuccess && (
-                <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm p-4 rounded-xl flex items-center gap-2">
-                  <svg className="w-4.5 h-4.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="font-semibold">{submitSuccess}</span>
                 </div>
               )}
 

@@ -4,7 +4,7 @@ import RepetitiveDocs from './RepetitiveDocs';
 import TenderAgentHelpSection from './TenderAgentHelpSection';
 
 export default function TenderDashboard() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeSidebarItem, setActiveSidebarItem] = useState('tenders');
 
   return (
