@@ -79,7 +79,7 @@ function App() {
         userDropdownItems={userDropdownItems}
       />
 
-      <main className="mx-auto max-w-7xl p-4">
+      <main className="mx-auto">
         {user.role === 'tender_agent' ? (
           <TenderDashboard />
         ) : user.role === 'MD' ? (
