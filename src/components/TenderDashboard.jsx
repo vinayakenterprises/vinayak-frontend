@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import TendersListView from './TendersListView';
 import RepetitiveDocs from './RepetitiveDocs';
+import TenderAgentHelpSection from './TenderAgentHelpSection';
 
 export default function TenderDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -10,9 +11,8 @@ export default function TenderDashboard() {
     <div className="flex w-full min-h-[calc(100vh-80px)] bg-slate-50 relative">
       {/* Sidebar Navigation */}
       <aside
-        className={`bg-white border-r border-slate-200 transition-all duration-300 flex flex-col shrink-0 overflow-hidden ${
-          isSidebarOpen ? 'w-64' : 'w-0'
-        }`}
+        className={`bg-white border-r border-slate-200 transition-all duration-300 flex flex-col shrink-0 overflow-hidden ${isSidebarOpen ? 'w-64' : 'w-0'
+          }`}
       >
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <span className="text-sm font-bold text-slate-800 tracking-wide uppercase">Navigation</span>
@@ -28,11 +28,10 @@ export default function TenderDashboard() {
         <nav className="flex-1 p-3 space-y-1">
           <button
             onClick={() => setActiveSidebarItem('tenders')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-              activeSidebarItem === 'tenders'
-                ? 'bg-sky-50 text-sky-600'
-                : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
-            }`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeSidebarItem === 'tenders'
+              ? 'bg-sky-50 text-sky-600'
+              : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+              }`}
           >
             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -41,16 +40,27 @@ export default function TenderDashboard() {
           </button>
           <button
             onClick={() => setActiveSidebarItem('repetitive-docs')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-              activeSidebarItem === 'repetitive-docs'
-                ? 'bg-sky-50 text-sky-600'
-                : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
-            }`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeSidebarItem === 'repetitive-docs'
+              ? 'bg-sky-50 text-sky-600'
+              : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+              }`}
           >
             <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             Repetitive Docs
+          </button>
+          <button
+            onClick={() => setActiveSidebarItem('tender-agent-help-section')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeSidebarItem === 'tender-agent-help-section'
+              ? 'bg-sky-50 text-sky-600'
+              : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+              }`}
+          >
+            <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Help
           </button>
         </nav>
       </aside>
@@ -73,6 +83,7 @@ export default function TenderDashboard() {
 
         {activeSidebarItem === 'tenders' && <TendersListView />}
         {activeSidebarItem === 'repetitive-docs' && <RepetitiveDocs />}
+        {activeSidebarItem === 'tender-agent-help-section' && <TenderAgentHelpSection />}
       </div>
     </div>
   );
