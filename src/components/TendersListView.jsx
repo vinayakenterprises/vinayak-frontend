@@ -97,6 +97,12 @@ export default function TendersListView() {
 
       if (response.ok && resData?.status === 'success') {
         const mapped = (resData.data || []).map(t => {
+          if (t.approved === false) {
+            return {
+              ...t,
+              status: 'Rejected'
+            };
+          }
           if (t.submission_actual !== undefined && t.submission_actual !== null && t.submission_actual !== '') {
             return {
               ...t,
