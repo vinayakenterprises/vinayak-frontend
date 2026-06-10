@@ -102,7 +102,7 @@ export default function Login({ onLoginSuccess }) {
                 required
                 value={emailId}
                 onChange={(e) => setEmailId(e.target.value)}
-                placeholder="e.g. riteshkshik@gmail.com"
+                placeholder="e.g. example@ve.com"
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all placeholder-slate-400"
               />
             </div>

@@ -187,7 +187,7 @@ export default function MDDashboard() {
       )}
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-2 mr-2 ml-2">
         {/* Total Tenders Card */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 rounded-xl flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
           <div className="space-y-0.5">
@@ -496,13 +496,12 @@ export default function MDDashboard() {
                     <h3 className="text-lg font-bold text-slate-950 dark:text-white">{selectedTender.tender_title}</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase mt-0.5">{selectedTender.tender_organization}</p>
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                    activeTab === 'Approved Tenders'
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${activeTab === 'Approved Tenders'
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900'
                       : activeTab === 'Rejected Tenders'
                         ? 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900'
                         : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
-                  }`}>
+                    }`}>
                     {activeTab === 'Approved Tenders'
                       ? 'Approved'
                       : activeTab === 'Rejected Tenders'
