@@ -21,6 +21,34 @@ const INDIAN_STATES = [
 
 const DOCUMENT_NAMES = ["Spec", "GCC", "IIB", "Notice", "BOQ"];
 
+const PRODUCT_NAMES = ["ab cable", "acsr", "aaa"];
+
+const AB_CABLE_TYPES = [
+  "ICX25+ICX25 SQMM BARE MESSENGER",
+  "ICX25+ICX25 SQMM INSULATED  MESSENGER",
+  "3CX25+ICX25 SQMM BARE MESSENGER",
+  "3CX25+ICX25 SQMM INSULATED  MESSENGER",
+  "3CX35+ICX25+1CX16 SQMM BARE MESSENGER",
+  "3CX35+ICX25+1CX16 SQMM INSULATED MESSENGER",
+  "3CX50+ICX35+1CX16 SQMM BARE MESSENGER",
+  "3CX50+ICX35+1CX16 SQMM INSULATED MESSENGER",
+  "3CX70+ICX50+1CX16 SQMM BARE MESSENGER",
+  "3CX70+ICX50+1CX16 SQMM INSULATED MESSENGER",
+  "3CX95+ICX70+1CX16 SQMM BARE MESSENGER",
+  "3CX95+ICX70+1CX16 SQMM INSULATED MESSENGER",
+  "3CX120+ICX70+1CX16 SQMM BARE MESSENGER",
+  "3CX120+ICX70+1CX16 SQMM INSULATED MESSENGER"
+];
+
+const ACSR_AAA_TYPES = [
+  "Mole",
+  "Rose",
+  "Squirrel",
+  "Rabbit",
+  "Raccoon",
+  "Dog"
+];
+
 const formatDate = (dateString) => {
   if (!dateString) return '';
   try {
@@ -44,6 +72,10 @@ export default function TendersListView() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTender, setSelectedTender] = useState(null);
+
+  // Helper state for Product Name & Product Type selection in Add/Edit modal
+  const [productNameSel, setProductNameSel] = useState('');
+  const [productTypeSel, setProductTypeSel] = useState('');
 
   // Approval states
   const [isSendingApproval, setIsSendingApproval] = useState(false);
@@ -150,6 +182,8 @@ export default function TendersListView() {
     tender_ref_no: '',
     tender_title: '',
     tender_organization: '',
+    product_name: '',
+    product_type: '',
     cable_length_km: '',
     publish_date: '',
     closing_date: '',
@@ -268,11 +302,28 @@ export default function TendersListView() {
       tender_value_cr: tender.tender_value_cr.toString(),
       tender_fee_inr: tender.tender_fee_inr.toString(),
       emd_inr: tender.emd_inr.toString(),
+      product_name: tender.product_name || '',
+      product_type: tender.product_type || '',
       // Ensure documents array exists
       tender_documents: tender.tender_documents && tender.tender_documents.length > 0
         ? tender.tender_documents
         : [{ name: '', url: '' }]
     });
+
+    const isStdName = PRODUCT_NAMES.includes(tender.product_name);
+    const resolvedNameSel = tender.product_name ? (isStdName ? tender.product_name : 'other') : '';
+    setProductNameSel(resolvedNameSel);
+
+    let resolvedTypeSel = '';
+    if (resolvedNameSel === 'ab cable') {
+      resolvedTypeSel = AB_CABLE_TYPES.includes(tender.product_type) ? tender.product_type : (tender.product_type ? 'Other' : '');
+    } else if (resolvedNameSel === 'acsr' || resolvedNameSel === 'aaa') {
+      resolvedTypeSel = ACSR_AAA_TYPES.includes(tender.product_type) ? tender.product_type : (tender.product_type ? 'Other' : '');
+    } else if (resolvedNameSel === 'other') {
+      resolvedTypeSel = 'Other';
+    }
+    setProductTypeSel(resolvedTypeSel);
+
     setSelectedTender(tender);
     setIsEditModalOpen(true);
     setActiveActionMenuId(null);
@@ -906,8 +957,19 @@ export default function TendersListView() {
     if (!formData.tender_id.trim() || !formData.tender_ref_no.trim() || !formData.tender_title.trim() ||
       !formData.tender_organization.trim() || !formData.cable_length_km || !formData.publish_date ||
       !formData.closing_date || !formData.tender_value_cr || !formData.tender_fee_inr ||
-      !formData.emd_inr || !formData.state) {
+      !formData.emd_inr || !formData.state ||
+      !formData.product_name || !formData.product_name.trim() ||
+      !formData.product_type || !formData.product_type.trim()) {
       setSubmitError('All fields are required.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate dates
+    const publishDate = new Date(formData.publish_date);
+    const closingDate = new Date(formData.closing_date);
+    if (publishDate >= closingDate) {
+      setSubmitError('Publish date must be earlier than the closing date.');
       setIsSubmitting(false);
       return;
     }
@@ -953,7 +1015,9 @@ export default function TendersListView() {
       tender_value_cr: Number(formData.tender_value_cr),
       tender_fee_inr: Number(formData.tender_fee_inr),
       emd_inr: Number(formData.emd_inr),
-      state: formData.state
+      state: formData.state,
+      product_name: formData.product_name,
+      product_type: formData.product_type
     };
 
     try {
@@ -1011,6 +1075,8 @@ export default function TendersListView() {
                 ...initialFormState,
                 status: selectedTabObj ? selectedTabObj.statusValue : 'Active'
               });
+              setProductNameSel('');
+              setProductTypeSel('');
               setSubmitError('');
               setSubmitSuccess('');
               setIsAddModalOpen(true);
@@ -1120,6 +1186,8 @@ export default function TendersListView() {
                               ...initialFormState,
                               status: selectedTabObj ? selectedTabObj.statusValue : 'Active'
                             });
+                            setProductNameSel('');
+                            setProductTypeSel('');
                             setSubmitError('');
                             setSubmitSuccess('');
                             setIsAddModalOpen(true);
@@ -1342,6 +1410,95 @@ export default function TendersListView() {
                     placeholder="e.g. BSNL"
                     className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow"
                   />
+                </div>
+
+                {/* Product Name */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Product Name <span className="text-rose-500">*</span></label>
+                  <select
+                    value={productNameSel}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setProductNameSel(val);
+                      setProductTypeSel('');
+                      if (val !== 'other') {
+                        setFormData(prev => ({ ...prev, product_name: val, product_type: '' }));
+                      } else {
+                        setFormData(prev => ({ ...prev, product_name: '', product_type: '' }));
+                        setProductTypeSel('Other');
+                      }
+                    }}
+                    required
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none bg-white focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow text-slate-800"
+                  >
+                    <option value="" disabled>Select Product Name</option>
+                    {PRODUCT_NAMES.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                    <option value="other">other</option>
+                  </select>
+                  {productNameSel === 'other' && (
+                    <input
+                      type="text"
+                      name="product_name"
+                      value={formData.product_name}
+                      onChange={handleInputChange}
+                      required
+                      placeholder="Type custom product name"
+                      className="mt-2 w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow"
+                    />
+                  )}
+                </div>
+
+                {/* Product Type */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Product Type <span className="text-rose-500">*</span></label>
+                  {productNameSel && productNameSel !== 'other' ? (
+                    <>
+                      <select
+                        value={productTypeSel}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setProductTypeSel(val);
+                          if (val !== 'Other') {
+                            setFormData(prev => ({ ...prev, product_type: val }));
+                          } else {
+                            setFormData(prev => ({ ...prev, product_type: '' }));
+                          }
+                        }}
+                        required
+                        className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none bg-white focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow text-slate-800"
+                      >
+                        <option value="" disabled>Select Product Type</option>
+                        {(productNameSel === 'ab cable' ? AB_CABLE_TYPES : ACSR_AAA_TYPES).map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                        <option value="Other">Other</option>
+                      </select>
+                      {productTypeSel === 'Other' && (
+                        <input
+                          type="text"
+                          name="product_type"
+                          value={formData.product_type}
+                          onChange={handleInputChange}
+                          required
+                          placeholder="Type custom product type"
+                          className="mt-2 w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow"
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <input
+                      type="text"
+                      name="product_type"
+                      value={formData.product_type}
+                      onChange={handleInputChange}
+                      required
+                      disabled={!productNameSel}
+                      placeholder={!productNameSel ? "Select Product Name first" : "Type custom product type"}
+                      className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow disabled:bg-slate-50 disabled:text-slate-400"
+                    />
+                  )}
                 </div>
 
                 {/* Cable Length KM */}
@@ -1679,6 +1836,16 @@ export default function TendersListView() {
                   <div>
                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Reference Number</span>
                     <span className="text-xs font-semibold text-slate-700">{selectedTender.tender_ref_no}</span>
+                  </div>
+
+                  <div>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Product Name</span>
+                    <span className="text-xs font-semibold text-slate-700">{selectedTender.product_name || 'N/A'}</span>
+                  </div>
+
+                  <div>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Product Type</span>
+                    <span className="text-xs font-semibold text-slate-700">{selectedTender.product_type || 'N/A'}</span>
                   </div>
 
                   <div>
