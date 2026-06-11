@@ -147,7 +147,7 @@ export default function TendersListView() {
               status: 'AssignedByAccountsTeam'
             };
           }
-          if (t.send_for_approaval && t.tender_stage == 2) {
+          if (t.send_for_approval && t.tender_stage == 2) {
             return {
               ...t,
               status: 'Pending MD Approval'
@@ -897,7 +897,7 @@ export default function TendersListView() {
 
       if (response.ok) {
         setApprovalSuccess(resData?.message || 'Tender sent for approval successfully!');
-        setSelectedTender(prev => prev ? { ...prev, send_for_approaval: true } : null);
+        setSelectedTender(prev => prev ? { ...prev, send_for_approval: true } : null);
         // Refresh tenders list
         loadTenders();
       } else {
@@ -2396,7 +2396,7 @@ export default function TendersListView() {
                   ) : activeTab === 'Submitted Tenders' ? null : (
                     <button
                       onClick={() => handleSendForApproval(selectedTender)}
-                      disabled={isSendingApproval || selectedTender?.send_for_approaval}
+                      disabled={isSendingApproval || selectedTender?.send_for_approval}
                       className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-400 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
                     >
                       {isSendingApproval ? (
@@ -2407,7 +2407,7 @@ export default function TendersListView() {
                           </svg>
                           Sending...
                         </>
-                      ) : selectedTender?.send_for_approaval ? (
+                      ) : selectedTender?.send_for_approval ? (
                         'Already Sent For Approval'
                       ) : (
                         'Send For Approval'
