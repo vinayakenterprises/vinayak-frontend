@@ -97,6 +97,10 @@ export default function TendersListView() {
     boq_filled: '',
     boq_filled_fileName: '',
     boq_filled_added_at: '',
+    courier: {
+      courier_status: false,
+      added_at: ''
+    },
     counter_offer: {
       enabled: false,
       documents: []
@@ -378,6 +382,18 @@ export default function TendersListView() {
       boq_filled: (tender.boq_filled && typeof tender.boq_filled === 'object') ? (tender.boq_filled.document_url || '') : '',
       boq_filled_fileName: (tender.boq_filled && typeof tender.boq_filled === 'object' && tender.boq_filled.document_url) ? tender.boq_filled.document_url.split('/').pop() : '',
       boq_filled_added_at: (tender.boq_filled && typeof tender.boq_filled === 'object') ? (tender.boq_filled.added_at || '') : '',
+      courier: (() => {
+        if (tender.courier && typeof tender.courier === 'object') {
+          return {
+            courier_status: !!tender.courier.courier_status,
+            added_at: tender.courier.added_at || ''
+          };
+        }
+        return {
+          courier_status: false,
+          added_at: ''
+        };
+      })(),
       counter_offer: (() => {
         if (!tender.counter_offer || typeof tender.counter_offer !== 'object') {
           return { enabled: false, documents: [] };
@@ -776,6 +792,12 @@ export default function TendersListView() {
             added_at: detailsForm.boq_filled_added_at || new Date().toISOString()
           }
         : null,
+      courier: {
+        courier_status: !!detailsForm.courier?.courier_status,
+        added_at: detailsForm.courier?.courier_status
+          ? (detailsForm.courier.added_at || new Date().toISOString())
+          : null
+      },
       counter_offer: {
         enabled: detailsForm.counter_offer.enabled,
         documents: detailsForm.counter_offer.enabled
@@ -821,6 +843,7 @@ export default function TendersListView() {
             fee_document: payload.fee_document,
             technical_document: payload.technical_document,
             boq_filled: payload.boq_filled,
+            courier: payload.courier,
             counter_offer: payload.counter_offer,
             loi: payload.loi,
             po: payload.po,
@@ -1987,6 +2010,37 @@ export default function TendersListView() {
                           </div>
                         </div>
 
+                        {/* Courier Toggle */}
+                        <div className="space-y-3 p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
+                          <div className="flex items-center justify-between">
+                            <label className="relative inline-flex items-center cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={detailsForm.courier?.courier_status || false}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setDetailsForm(prev => ({
+                                    ...prev,
+                                    courier: {
+                                      ...prev.courier,
+                                      courier_status: checked
+                                    }
+                                  }));
+                                }}
+                                disabled={isTenderCompleted}
+                                className="sr-only peer"
+                              />
+                              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-75"></div>
+                              <span className="ms-3 text-sm font-semibold text-slate-700">Courier</span>
+                            </label>
+                            {detailsForm.courier?.courier_status && detailsForm.courier?.added_at && (
+                              <span className="text-[10px] text-slate-450 italic">
+                                Enabled: {new Date(detailsForm.courier.added_at).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
                         {/* Shortfall Toggle */}
                         <div className="space-y-3 p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
                           <div className="flex items-center justify-between">
@@ -2321,6 +2375,22 @@ export default function TendersListView() {
                       </div>
 
                       <div className="space-y-4">
+                        {/* Courier Details */}
+                        {selectedTender.courier?.courier_status ? (
+                          <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl flex items-center justify-between">
+                            <div>
+                              <span className="block text-[10px] font-bold text-slate-400 uppercase">Courier Status</span>
+                              <span className="text-xs font-semibold text-slate-700">Enabled</span>
+                            </div>
+                            {selectedTender.courier.added_at && (
+                              <div className="text-right">
+                                <span className="block text-[10px] font-bold text-slate-400 uppercase">Sent Date</span>
+                                <span className="text-xs font-semibold text-slate-600">{new Date(selectedTender.courier.added_at).toLocaleString()}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+
                         {/* Shortfall Details */}
                         {selectedTender.shortfall ? (
                           <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
