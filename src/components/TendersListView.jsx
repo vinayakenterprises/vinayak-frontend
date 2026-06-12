@@ -7,7 +7,7 @@ const TABS = [
   { id: 'Rejected Tender', label: 'Rejected Tender', statusValue: 'Rejected' },
   { id: 'Shortfall Raised', label: 'Shortfall Raised', statusValue: 'Shortfall Raised' },
   { id: 'Submitted Tenders', label: 'Complete Tenders', statusValue: 'Submitted' },
-  { id: 'Assigned by Accounts Team', label: 'Assigned by Accounts Team', statusValue: 'AssignedByAccountsTeam' }
+  { id: 'Approved By MD Tenders', label: 'Approved By MD Tenders', statusValue: 'ApprovedByMDTenders' }
 ];
 
 const INDIAN_STATES = [
@@ -82,7 +82,7 @@ export default function TendersListView() {
   const [approvalError, setApprovalError] = useState('');
   const [approvalSuccess, setApprovalSuccess] = useState('');
 
-  // Details update states (Assigned by Accounts Team tab)
+  // Details update states (Approved By MD Tenders tab)
   const [detailsForm, setDetailsForm] = useState({
     shortfall: false,
     docs_resubmitted: [],
@@ -117,53 +117,63 @@ export default function TendersListView() {
     setFetchError('');
     const token = localStorage.getItem('token') || '';
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/get-all`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const resData = await response.json().catch(() => null);
-
-      if (response.ok && resData?.status === 'success') {
-        const mapped = (resData.data || []).map(t => {
-          if (t.approved === false) {
-            return {
-              ...t,
-              status: 'Rejected'
-            };
+    const safeFetch = async (endpoint) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/tenders/${endpoint}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
-          if (t.submission_actual !== undefined && t.submission_actual !== null && t.submission_actual !== '') {
-            return {
-              ...t,
-              status: 'Submitted'
-            };
-          }
-          if (t.is_accounts_team_work_done && Number(t.tender_stage) === 4) {
-            return {
-              ...t,
-              status: 'AssignedByAccountsTeam'
-            };
-          }
-          if (t.send_for_approval && t.tender_stage == 2) {
-            return {
-              ...t,
-              status: 'Pending MD Approval'
-            };
-          }
-          return {
-            ...t,
-            status: 'Active'
-          };
         });
-
-        console.log('mapped', mapped);
-        setTenders(mapped);
-      } else {
-        setFetchError(resData?.message || resData?.error || 'Failed to retrieve tenders from server.');
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        const resData = await response.json();
+        if (resData?.status === 'success') {
+          return resData.data || [];
+        }
+        throw new Error(resData?.message || resData?.error || 'Unsuccessful response status');
+      } catch (err) {
+        console.error(`Error fetching from ${endpoint}:`, err);
+        return [];
       }
+    };
+
+    try {
+      const [
+        activeList,
+        pendingList,
+        rejectedList,
+        shortfallList,
+        completedList,
+        approvedList
+      ] = await Promise.all([
+        safeFetch('get-active-tenders'),
+        safeFetch('get-pending-md-approval-tenders'),
+        safeFetch('get-rejected-tenders-for-tender-agent'),
+        safeFetch('get-shortfall-tenders'),
+        safeFetch('get-completed-tenders-for-tender-agent'),
+        safeFetch('get-approved-tenders-for-tender-agent')
+      ]);
+
+      const mappedActive = activeList.map(t => ({ ...t, status: 'Active' }));
+      const mappedPending = pendingList.map(t => ({ ...t, status: 'Pending MD Approval' }));
+      const mappedRejected = rejectedList.map(t => ({ ...t, status: 'Rejected' }));
+      const mappedShortfall = shortfallList.map(t => ({ ...t, status: 'Shortfall Raised' }));
+      const mappedCompleted = completedList.map(t => ({ ...t, status: 'Submitted' }));
+      const mappedApproved = approvedList.map(t => ({ ...t, status: 'ApprovedByMDTenders' }));
+
+      const combined = [
+        ...mappedActive,
+        ...mappedPending,
+        ...mappedRejected,
+        ...mappedShortfall,
+        ...mappedCompleted,
+        ...mappedApproved
+      ];
+
+      console.log('Mapped and combined tenders count:', combined.length);
+      setTenders(combined);
     } catch (err) {
       console.error(err);
       setFetchError(`Network error: ${err.message || err}. Could not connect to API server.`);
@@ -1760,7 +1770,7 @@ export default function TendersListView() {
       {/* View Tender Details Modal */}
       {isViewModalOpen && selectedTender && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200">
-          <div className={`bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${(activeTab === 'Assigned by Accounts Team' || activeTab === 'Submitted Tenders') ? 'max-w-2xl' : 'max-w-lg'} max-h-[90vh] overflow-hidden flex flex-col scale-in duration-150`}>
+          <div className={`bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${(activeTab === 'Approved By MD Tenders' || activeTab === 'Submitted Tenders') ? 'max-w-2xl' : 'max-w-lg'} max-h-[90vh] overflow-hidden flex flex-col scale-in duration-150`}>
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-900">Tender Details</h2>
@@ -1905,8 +1915,8 @@ export default function TendersListView() {
                       <p className="text-xs text-slate-505 italic">No documents attached.</p>
                     )}
                   </div>
-                  {/* Assigned by Accounts Team update form fields */}
-                  {activeTab === 'Assigned by Accounts Team' && (
+                  {/* Approved By MD Tenders update form fields */}
+                  {activeTab === 'Approved By MD Tenders' && (
                     <div className="border-t border-slate-100 pt-5 space-y-4">
                       <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Update Assigned Tender Details</h3>
 
@@ -2353,7 +2363,7 @@ export default function TendersListView() {
               {/* Modal Footer */}
               <div className="border-t border-slate-100 p-4 bg-slate-50/50 flex justify-between items-center gap-2">
                 <div className="flex gap-2">
-                  {activeTab === 'Assigned by Accounts Team' ? (
+                  {activeTab === 'Approved By MD Tenders' ? (
                     <>
                       <button
                         onClick={() => handleSaveTenderDetails(false)}
