@@ -114,7 +114,11 @@ export default function TendersListView() {
     a9slip_added_at: '',
     counter_offer: {
       enabled: false,
-      documents: []
+      documents: [],
+      sent_for_approval: false,
+      sent_for_approval_at: '',
+      counter_offer_approve_by_md: false,
+      counter_offer_approve_by_md_at: null
     },
     loi: '',
     loi_fileName: '',
@@ -431,31 +435,51 @@ export default function TendersListView() {
       a9slip_added_at: (tender.a9slip && typeof tender.a9slip === 'object') ? (tender.a9slip.added_at || '') : '',
       counter_offer: (() => {
         if (!tender.counter_offer || typeof tender.counter_offer !== 'object') {
-          return { enabled: false, documents: [] };
+          return {
+            enabled: false,
+            documents: [],
+            sent_for_approval: false,
+            sent_for_approval_at: '',
+            counter_offer_approve_by_md: false,
+            counter_offer_approve_by_md_at: null
+          };
         }
-        const enabled = !!tender.counter_offer.enabled;
+        const enabled = tender.counter_offer.counter_offer !== undefined
+          ? !!tender.counter_offer.counter_offer
+          : !!tender.counter_offer.enabled;
+
+        const sent_for_approval = !!tender.counter_offer.sent_for_approval;
+        const sent_for_approval_at = tender.counter_offer.sent_for_approval_at || '';
+        const counter_offer_approve_by_md = !!tender.counter_offer.counter_offer_approve_by_md;
+        const counter_offer_approve_by_md_at = tender.counter_offer.counter_offer_approve_by_md_at || null;
+
         let documents = [];
         if (Array.isArray(tender.counter_offer.documents)) {
           documents = tender.counter_offer.documents.map(d => ({
-            tag: d.tag || 'counter price',
-            url: d.url || '',
+            url: d.url || d.document_url || '',
+            remark: d.remark || '',
             uploading: false,
             error: '',
-            fileName: d.fileName || d.url?.split('/').pop() || 'Uploaded.pdf'
+            fileName: d.fileName || d.url?.split('/').pop() || d.document_url?.split('/').pop() || 'Uploaded.pdf'
           }));
         } else if (tender.counter_offer.doc_url) {
-          // Fallback mapping from old schema format
+          // Fallback mapping from old format
           documents = [{
-            tag: Array.isArray(tender.counter_offer.tags) && tender.counter_offer.tags.length > 0
-              ? tender.counter_offer.tags[0]
-              : 'counter price',
             url: tender.counter_offer.doc_url,
+            remark: '',
             uploading: false,
             error: '',
             fileName: tender.counter_offer.fileName || tender.counter_offer.doc_url.split('/').pop() || 'Uploaded.pdf'
           }];
         }
-        return { enabled, documents };
+        return {
+          enabled,
+          documents,
+          sent_for_approval,
+          sent_for_approval_at,
+          counter_offer_approve_by_md,
+          counter_offer_approve_by_md_at
+        };
       })(),
       loi: tender.loi || '',
       loi_fileName: tender.loi ? (tender.loi_name || tender.loi.split('/').pop()) : '',
@@ -678,9 +702,26 @@ export default function TendersListView() {
       ...prev,
       counter_offer: {
         ...prev.counter_offer,
-        documents: [...prev.counter_offer.documents, { tag: 'counter price', url: '', uploading: false, error: '', fileName: '' }]
+        documents: [...prev.counter_offer.documents, { url: '', remark: '', uploading: false, error: '', fileName: '' }]
       }
     }));
+  };
+
+  const handleSendCounterOfferForApproval = async () => {
+    if (detailsForm.counter_offer.documents.some(d => d.uploading)) {
+      alert('Please wait for files to finish uploading before sending for approval.');
+      return;
+    }
+    const updatedCounterOffer = {
+      ...detailsForm.counter_offer,
+      sent_for_approval: true,
+      sent_for_approval_at: new Date().toISOString()
+    };
+    setDetailsForm(prev => ({
+      ...prev,
+      counter_offer: updatedCounterOffer
+    }));
+    await handleSaveTenderDetails(false, updatedCounterOffer);
   };
 
   const removeCounterOfferDocRow = (index) => {
@@ -786,7 +827,7 @@ export default function TendersListView() {
   };
 
   // Save/Update Details to backend
-  const handleSaveTenderDetails = async (isMarkComplete = false) => {
+  const handleSaveTenderDetails = async (isMarkComplete = false, counterOfferOverride = null) => {
     setIsSavingDetails(true);
     setDetailsSaveError('');
     setDetailsSaveSuccess('');
@@ -862,9 +903,16 @@ export default function TendersListView() {
         }
         : null,
       counter_offer: {
-        enabled: detailsForm.counter_offer.enabled,
-        documents: detailsForm.counter_offer.enabled
-          ? detailsForm.counter_offer.documents.map(d => ({ tag: d.tag, url: d.url }))
+        counter_offer: !!counterOfferOverride ? !!counterOfferOverride.enabled : !!detailsForm.counter_offer.enabled,
+        sent_for_approval: !!counterOfferOverride ? !!counterOfferOverride.sent_for_approval : !!detailsForm.counter_offer.sent_for_approval,
+        ...((counterOfferOverride ? counterOfferOverride.sent_for_approval_at : detailsForm.counter_offer.sent_for_approval_at) ? { sent_for_approval_at: (counterOfferOverride ? counterOfferOverride.sent_for_approval_at : detailsForm.counter_offer.sent_for_approval_at) } : {}),
+        counter_offer_approve_by_md: !!counterOfferOverride ? !!counterOfferOverride.counter_offer_approve_by_md : !!detailsForm.counter_offer.counter_offer_approve_by_md,
+        ...((counterOfferOverride ? counterOfferOverride.counter_offer_approve_by_md_at : detailsForm.counter_offer.counter_offer_approve_by_md_at) ? { counter_offer_approve_by_md_at: (counterOfferOverride ? counterOfferOverride.counter_offer_approve_by_md_at : detailsForm.counter_offer.counter_offer_approve_by_md_at) } : { counter_offer_approve_by_md_at: null }),
+        documents: (counterOfferOverride ? counterOfferOverride.enabled : detailsForm.counter_offer.enabled)
+          ? (counterOfferOverride ? counterOfferOverride.documents : detailsForm.counter_offer.documents).map(d => ({
+              url: d.url || '',
+              remark: d.remark || ''
+            }))
           : []
       },
       loi: detailsForm.loi || null,
@@ -2304,25 +2352,26 @@ export default function TendersListView() {
                                     // Prepopulate with a default row if enabling and currently empty
                                     const existingDocs = prev.counter_offer.documents || [];
                                     const documents = (checked && existingDocs.length === 0)
-                                      ? [{ tag: 'counter price', url: '', uploading: false, error: '', fileName: '' }]
+                                      ? [{ url: '', remark: '', uploading: false, error: '', fileName: '' }]
                                       : existingDocs;
                                     return {
                                       ...prev,
                                       counter_offer: {
+                                        ...prev.counter_offer,
                                         enabled: checked,
                                         documents
                                       }
                                     };
                                   });
                                 }}
-                                disabled={isTenderCompleted}
+                                disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval || detailsForm.counter_offer.counter_offer_approve_by_md}
                                 className="sr-only peer"
                               />
                               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-75"></div>
                               <span className="ms-3 text-sm font-semibold text-slate-700">Counter Offer</span>
                             </label>
 
-                            {detailsForm.counter_offer.enabled && !isTenderCompleted && (
+                            {detailsForm.counter_offer.enabled && !isTenderCompleted && !detailsForm.counter_offer.sent_for_approval && (
                               <button
                                 type="button"
                                 onClick={addCounterOfferDocRow}
@@ -2342,23 +2391,9 @@ export default function TendersListView() {
                                 {detailsForm.counter_offer.documents.map((doc, idx) => (
                                   <div key={idx} className="flex gap-3 items-end bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
                                     <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                      {/* Document Tag / Name Input */}
-                                      <div>
-                                        <label className="block text-[10px] font-bold text-slate-505 uppercase mb-1">Tag / Document Label <span className="text-rose-500">*</span></label>
-                                        <input
-                                          type="text"
-                                          value={doc.tag}
-                                          onChange={(e) => handleCounterOfferDocChange(idx, 'tag', e.target.value)}
-                                          required
-                                          disabled={isTenderCompleted}
-                                          placeholder="e.g. counter price"
-                                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:border-sky-505 bg-white text-slate-800 disabled:bg-slate-50 disabled:text-slate-550"
-                                        />
-                                      </div>
-
                                       {/* Document PDF Upload */}
-                                      <div>
-                                        <label className="block text-[10px] font-bold text-slate-505 uppercase mb-1">Document PDF <span className="text-rose-500">*</span></label>
+                                      <div className={!doc.url ? "col-span-1 sm:col-span-2" : ""}>
+                                        <label className="block text-[10px] font-bold text-slate-550 uppercase mb-1">Document PDF <span className="text-rose-500">*</span></label>
                                         <div className="flex items-center gap-2">
                                           {doc.uploading ? (
                                             <div className="flex-1 flex items-center gap-1.5 py-1.5 text-xs text-slate-500 font-medium">
@@ -2389,7 +2424,7 @@ export default function TendersListView() {
                                             <div className="flex-1 text-slate-400 italic text-xs py-1.5">No file uploaded</div>
                                           )}
 
-                                          {!doc.uploading && !isTenderCompleted && (
+                                          {!doc.uploading && !isTenderCompleted && !detailsForm.counter_offer.sent_for_approval && (
                                             <div>
                                               <label
                                                 htmlFor={`details-counter-offer-upload-${idx}`}
@@ -2417,9 +2452,24 @@ export default function TendersListView() {
                                           <p className="text-[10px] text-rose-500 font-medium mt-1">{doc.error}</p>
                                         )}
                                       </div>
+
+                                      {/* Remark Text Input */}
+                                      {doc.url && (
+                                        <div className="animate-fadeIn">
+                                          <label className="block text-[10px] font-bold text-slate-550 uppercase mb-1">Remark</label>
+                                          <input
+                                            type="text"
+                                            value={doc.remark || ''}
+                                            onChange={(e) => handleCounterOfferDocChange(idx, 'remark', e.target.value)}
+                                            disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval}
+                                            placeholder="e.g. Comments regarding the PDF"
+                                            className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded text-xs focus:outline-none focus:border-sky-505 text-slate-800 disabled:bg-slate-550 disabled:bg-slate-50 disabled:text-slate-550"
+                                          />
+                                        </div>
+                                      )}
                                     </div>
 
-                                    {!isTenderCompleted && (
+                                    {!isTenderCompleted && !detailsForm.counter_offer.sent_for_approval && (
                                       <button
                                         type="button"
                                         onClick={() => removeCounterOfferDocRow(idx)}
@@ -2436,6 +2486,40 @@ export default function TendersListView() {
                                 {detailsForm.counter_offer.documents.length === 0 && (
                                   <p className="text-xs text-slate-455 italic text-center py-2">No documents added. Click "Add Document" to start uploading counter offer files.</p>
                                 )}
+
+                                {/* MD Approval status indication banner */}
+                                {detailsForm.counter_offer.counter_offer_approve_by_md && (
+                                  <div className="flex justify-between items-center bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-lg p-3 text-xs font-bold animate-fadeIn mt-2">
+                                    <span className="flex items-center gap-1.5">
+                                      <svg className="w-4.5 h-4.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      This counter offer has been approved.
+                                    </span>
+                                    {detailsForm.counter_offer.counter_offer_approve_by_md_at && (
+                                      <span className="text-[10px] text-emerald-600 font-semibold">
+                                        Approved At: {new Date(detailsForm.counter_offer.counter_offer_approve_by_md_at).toLocaleString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Send for Approval Button */}
+                                <div className="flex justify-end pt-2 gap-2 items-center">
+                                  {detailsForm.counter_offer.sent_for_approval && detailsForm.counter_offer.sent_for_approval_at && (
+                                    <span className="text-[10px] text-slate-550 italic mr-2 animate-fadeIn font-semibold text-slate-500">
+                                      Sent At: {new Date(detailsForm.counter_offer.sent_for_approval_at).toLocaleString()}
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={handleSendCounterOfferForApproval}
+                                    disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval || detailsForm.counter_offer.counter_offer_approve_by_md || detailsForm.counter_offer.documents.length === 0 || detailsForm.counter_offer.documents.some(d => !d.url || d.uploading)}
+                                    className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
+                                  >
+                                    {detailsForm.counter_offer.sent_for_approval ? 'Sent For Approval' : 'Send For Approval'}
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -2591,20 +2675,49 @@ export default function TendersListView() {
                         ) : null}
 
                         {/* Counter Offer Details */}
-                        {selectedTender.counter_offer?.enabled ? (
+                        {selectedTender.counter_offer?.enabled || selectedTender.counter_offer?.counter_offer ? (
                           <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-bold text-slate-700">Counter Offer Status</span>
                               <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full">Enabled</span>
                             </div>
-                            <div className="space-y-2">
+
+                            {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md) && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-3 animate-fadeIn">
+                                {selectedTender.counter_offer?.sent_for_approval && (
+                                  <div>
+                                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Sent for Approval At</span>
+                                    <span className="text-xs font-semibold text-slate-700">
+                                      {new Date(selectedTender.counter_offer.sent_for_approval_at).toLocaleString()}
+                                    </span>
+                                  </div>
+                                )}
+                                {selectedTender.counter_offer?.counter_offer_approve_by_md && (
+                                  <div>
+                                    <span className="block text-[10px] font-bold text-slate-400 uppercase">MD Approval Status</span>
+                                    <span className="text-xs font-bold text-emerald-600">
+                                      Approved {selectedTender.counter_offer.counter_offer_approve_by_md_at ? `at ${new Date(selectedTender.counter_offer.counter_offer_approve_by_md_at).toLocaleString()}` : ''}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="space-y-2 border-t border-slate-100 pt-3">
                               <span className="block text-[10px] font-bold text-slate-400 uppercase">Counter Offer Documents</span>
                               {selectedTender.counter_offer.documents && selectedTender.counter_offer.documents.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="space-y-2">
                                   {selectedTender.counter_offer.documents.map((doc, idx) => (
-                                    <div key={idx} className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
-                                      <span className="truncate pr-2 font-semibold text-slate-600">{doc.tag}</span>
-                                      <a href={doc.url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-150 rounded-lg p-3 text-xs font-medium text-slate-700 animate-fadeIn">
+                                      <div className="flex-1 min-w-0">
+                                        <span className="block font-bold text-slate-800 truncate">{doc.fileName || doc.url?.split('/').pop() || 'Uploaded Document'}</span>
+                                        {doc.remark && (
+                                          <span className="block text-[11px] text-slate-505 text-slate-500 font-normal mt-1 bg-slate-50/50 p-1.5 rounded border border-slate-100/50">
+                                            <span className="font-semibold text-slate-600">Remark:</span> {doc.remark}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <a href={doc.url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0 self-end sm:self-center">View File</a>
                                     </div>
                                   ))}
                                 </div>
