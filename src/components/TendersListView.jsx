@@ -101,6 +101,16 @@ export default function TendersListView() {
       courier_status: false,
       added_at: ''
     },
+    submission_actual: {
+      submission_actual_status: false,
+      added_at: ''
+    },
+    submit_to_govt_portal_slip: '',
+    submit_to_govt_portal_slip_fileName: '',
+    submit_to_govt_portal_slip_added_at: '',
+    a9slip: '',
+    a9slip_fileName: '',
+    a9slip_added_at: '',
     counter_offer: {
       enabled: false,
       documents: []
@@ -394,6 +404,24 @@ export default function TendersListView() {
           added_at: ''
         };
       })(),
+      submission_actual: (() => {
+        if (tender.submission_actual && typeof tender.submission_actual === 'object') {
+          return {
+            submission_actual_status: !!tender.submission_actual.submission_actual_status,
+            added_at: tender.submission_actual.added_at || ''
+          };
+        }
+        return {
+          submission_actual_status: false,
+          added_at: ''
+        };
+      })(),
+      submit_to_govt_portal_slip: (tender.submit_to_govt_portal_slip && typeof tender.submit_to_govt_portal_slip === 'object') ? (tender.submit_to_govt_portal_slip.document_url || '') : '',
+      submit_to_govt_portal_slip_fileName: (tender.submit_to_govt_portal_slip && typeof tender.submit_to_govt_portal_slip === 'object' && tender.submit_to_govt_portal_slip.document_url) ? tender.submit_to_govt_portal_slip.document_url.split('/').pop() : '',
+      submit_to_govt_portal_slip_added_at: (tender.submit_to_govt_portal_slip && typeof tender.submit_to_govt_portal_slip === 'object') ? (tender.submit_to_govt_portal_slip.added_at || '') : '',
+      a9slip: (tender.a9slip && typeof tender.a9slip === 'object') ? (tender.a9slip.document_url || '') : '',
+      a9slip_fileName: (tender.a9slip && typeof tender.a9slip === 'object' && tender.a9slip.document_url) ? tender.a9slip.document_url.split('/').pop() : '',
+      a9slip_added_at: (tender.a9slip && typeof tender.a9slip === 'object') ? (tender.a9slip.added_at || '') : '',
       counter_offer: (() => {
         if (!tender.counter_offer || typeof tender.counter_offer !== 'object') {
           return { enabled: false, documents: [] };
@@ -798,6 +826,24 @@ export default function TendersListView() {
           ? (detailsForm.courier.added_at || new Date().toISOString())
           : null
       },
+      submission_actual: {
+        submission_actual_status: !!detailsForm.submission_actual?.submission_actual_status,
+        added_at: detailsForm.submission_actual?.submission_actual_status
+          ? (detailsForm.submission_actual.added_at || new Date().toISOString())
+          : null
+      },
+      submit_to_govt_portal_slip: detailsForm.submit_to_govt_portal_slip
+        ? {
+            document_url: detailsForm.submit_to_govt_portal_slip,
+            ...(detailsForm.submit_to_govt_portal_slip_added_at ? { added_at: detailsForm.submit_to_govt_portal_slip_added_at } : {})
+          }
+        : null,
+      a9slip: detailsForm.a9slip
+        ? {
+            document_url: detailsForm.a9slip,
+            ...(detailsForm.a9slip_added_at ? { added_at: detailsForm.a9slip_added_at } : {})
+          }
+        : null,
       counter_offer: {
         enabled: detailsForm.counter_offer.enabled,
         documents: detailsForm.counter_offer.enabled
@@ -809,7 +855,7 @@ export default function TendersListView() {
       contract_agreement: detailsForm.contract_agreement || null,
       warranty: detailsForm.warranty || null,
       acceptance_letter: detailsForm.acceptance_letter || null,
-      ...(isMarkComplete ? { submission_actual: currentTimestamp } : {})
+      ...(isMarkComplete ? { tender_completed_at: currentTimestamp } : {})
     };
 
     const token = localStorage.getItem('token') || '';
@@ -844,13 +890,16 @@ export default function TendersListView() {
             technical_document: payload.technical_document,
             boq_filled: payload.boq_filled,
             courier: payload.courier,
+            submission_actual: payload.submission_actual,
+            submit_to_govt_portal_slip: payload.submit_to_govt_portal_slip,
+            a9slip: payload.a9slip,
             counter_offer: payload.counter_offer,
             loi: payload.loi,
             po: payload.po,
             contract_agreement: payload.contract_agreement,
             warranty: payload.warranty,
             acceptance_letter: payload.acceptance_letter,
-            ...(isMarkComplete ? { submission_actual: currentTimestamp } : {})
+            tender_completed_at: payload.tender_completed_at || prev.tender_completed_at
           };
         });
 
@@ -871,7 +920,7 @@ export default function TendersListView() {
     }
   };
 
-  const isTenderCompleted = selectedTender?.submission_actual != null;
+  const isTenderCompleted = selectedTender?.tender_completed_at != null;
 
   const renderSingleFileUploadDetails = (field, label, accept = ".pdf") => {
     const fileUrl = detailsForm[field];
@@ -2041,6 +2090,46 @@ export default function TendersListView() {
                           </div>
                         </div>
 
+                        {/* Submit to Govt Portal Toggle */}
+                        <div className="space-y-3 p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
+                          <div className="flex items-center justify-between">
+                            <label className="relative inline-flex items-center cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={detailsForm.submission_actual?.submission_actual_status || false}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setDetailsForm(prev => ({
+                                    ...prev,
+                                    submission_actual: {
+                                      ...prev.submission_actual,
+                                      submission_actual_status: checked
+                                    }
+                                  }));
+                                }}
+                                disabled={isTenderCompleted}
+                                className="sr-only peer"
+                              />
+                              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-75"></div>
+                              <span className="ms-3 text-sm font-semibold text-slate-700">Submit to Govt Portal</span>
+                            </label>
+                            {detailsForm.submission_actual?.submission_actual_status && detailsForm.submission_actual?.added_at && (
+                              <span className="text-[10px] text-slate-450 italic">
+                                Enabled: {new Date(detailsForm.submission_actual.added_at).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+
+                          {detailsForm.submission_actual?.submission_actual_status && (
+                            <div className="space-y-3 border-t border-slate-200/50 pt-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fadeIn">
+                                {renderSingleFileUploadDetails('submit_to_govt_portal_slip', 'Govt Portal Submission Slip (PDF)', '.pdf')}
+                                {renderSingleFileUploadDetails('a9slip', 'A9 Slip (PDF)', '.pdf')}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         {/* Shortfall Toggle */}
                         <div className="space-y-3 p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
                           <div className="flex items-center justify-between">
@@ -2366,10 +2455,12 @@ export default function TendersListView() {
                             <span className="text-xs font-semibold text-slate-700">{formatDate(selectedTender.submission_expected)}</span>
                           </div>
                         )}
-                        {selectedTender.submission_actual && (
+                        {(selectedTender.tender_completed_at || (selectedTender.submission_actual && typeof selectedTender.submission_actual === 'string')) && (
                           <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                            <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual Submission</span>
-                            <span className="text-xs font-semibold text-slate-700">{new Date(selectedTender.submission_actual).toLocaleString()}</span>
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase">Tender Completed At</span>
+                            <span className="text-xs font-semibold text-slate-700">
+                              {new Date(selectedTender.tender_completed_at || selectedTender.submission_actual).toLocaleString()}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -2386,6 +2477,40 @@ export default function TendersListView() {
                               <div className="text-right">
                                 <span className="block text-[10px] font-bold text-slate-400 uppercase">Sent Date</span>
                                 <span className="text-xs font-semibold text-slate-600">{new Date(selectedTender.courier.added_at).toLocaleString()}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {/* Submit to Govt Portal Details */}
+                        {selectedTender.submission_actual?.submission_actual_status ? (
+                          <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="block text-[10px] font-bold text-slate-400 uppercase">Submit to Govt Portal Status</span>
+                                <span className="text-xs font-semibold text-slate-700">Enabled</span>
+                              </div>
+                              {selectedTender.submission_actual.added_at && (
+                                <div className="text-right">
+                                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Submission Date</span>
+                                  <span className="text-xs font-semibold text-slate-600">{new Date(selectedTender.submission_actual.added_at).toLocaleString()}</span>
+                                </div>
+                              )}
+                            </div>
+                            {(selectedTender.submit_to_govt_portal_slip?.document_url || selectedTender.a9slip?.document_url) && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-slate-200/50 pt-3 animate-fadeIn">
+                                {selectedTender.submit_to_govt_portal_slip?.document_url && (
+                                  <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                    <span className="truncate pr-2">Submission Slip</span>
+                                    <a href={selectedTender.submit_to_govt_portal_slip.document_url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                  </div>
+                                )}
+                                {selectedTender.a9slip?.document_url && (
+                                  <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                    <span className="truncate pr-2">A9 Slip</span>
+                                    <a href={selectedTender.a9slip.document_url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
