@@ -87,7 +87,8 @@ export default function TendersListView() {
     shortfall: false,
     docs_resubmitted: [],
     rank_file: '',
-    rank_fileName: '',
+    rank_file_fileName: '',
+    rank_file_added_at: '',
     fee_document: '',
     fee_document_fileName: '',
     fee_document_added_at: '',
@@ -375,14 +376,20 @@ export default function TendersListView() {
       shortfall: !!tender.shortfall,
       docs_resubmitted: Array.isArray(tender.docs_resubmitted)
         ? tender.docs_resubmitted.map(d => ({
-          ...d,
+          document_name: d.document_name || d.name || '',
+          document_url: d.document_url || d.url || '',
+          reason: d.reason || '',
+          added_at: d.added_at || '',
           uploading: false,
           error: '',
-          fileName: d.name || d.fileName || d.url?.split('/').pop() || 'Uploaded.pdf'
+          fileName: d.document_name || d.name || d.fileName || d.document_url?.split('/').pop() || d.url?.split('/').pop() || 'Uploaded.pdf'
         }))
         : [],
-      rank_file: tender.rank_file || '',
-      rank_fileName: tender.rank_file ? (tender.rank_file_name || tender.rank_file.split('/').pop()) : '',
+      rank_file: (tender.rank_file && typeof tender.rank_file === 'object') ? (tender.rank_file.document_url || '') : (typeof tender.rank_file === 'string' ? tender.rank_file : ''),
+      rank_file_fileName: (tender.rank_file && typeof tender.rank_file === 'object' && tender.rank_file.document_url)
+        ? tender.rank_file.document_url.split('/').pop()
+        : (typeof tender.rank_file === 'string' ? tender.rank_file.split('/').pop() : ''),
+      rank_file_added_at: (tender.rank_file && typeof tender.rank_file === 'object') ? (tender.rank_file.added_at || '') : '',
       fee_document: (tender.fee_document && typeof tender.fee_document === 'object') ? (tender.fee_document.document_url || '') : '',
       fee_document_fileName: (tender.fee_document && typeof tender.fee_document === 'object' && tender.fee_document.document_url) ? tender.fee_document.document_url.split('/').pop() : '',
       fee_document_added_at: (tender.fee_document && typeof tender.fee_document === 'object') ? (tender.fee_document.added_at || '') : '',
@@ -572,7 +579,7 @@ export default function TendersListView() {
   const addDocsResubmittedRow = () => {
     setDetailsForm(prev => ({
       ...prev,
-      docs_resubmitted: [...prev.docs_resubmitted, { name: 'Spec', url: '', uploading: false, error: '', fileName: '' }]
+      docs_resubmitted: [...prev.docs_resubmitted, { document_name: '', document_url: '', reason: '', uploading: false, error: '', fileName: '' }]
     }));
   };
 
@@ -599,6 +606,7 @@ export default function TendersListView() {
     updatedDocs[index].uploading = true;
     updatedDocs[index].error = '';
     updatedDocs[index].fileName = file.name;
+    updatedDocs[index].document_name = file.name;
     setDetailsForm(prev => ({
       ...prev,
       docs_resubmitted: updatedDocs
@@ -623,7 +631,10 @@ export default function TendersListView() {
         const url = resData.data.url;
         setDetailsForm(prev => {
           const docs = [...prev.docs_resubmitted];
+          docs[index].document_url = url;
           docs[index].url = url;
+          docs[index].document_name = file.name;
+          docs[index].fileName = file.name;
           docs[index].uploading = false;
           docs[index].error = '';
           docs[index].added_at = '';
@@ -796,29 +807,35 @@ export default function TendersListView() {
       shortfall: detailsForm.shortfall,
       docs_resubmitted: detailsForm.shortfall
         ? detailsForm.docs_resubmitted.map(d => ({
-            name: d.name,
-            url: d.url,
-            added_at: d.added_at || new Date().toISOString()
-          }))
+          document_name: d.document_name || d.fileName || '',
+          document_url: d.document_url || d.url || '',
+          reason: d.reason || '',
+          ...(d.added_at ? { added_at: d.added_at } : {})
+        }))
         : [],
-      rank_file: detailsForm.rank_file || null,
+      rank_file: detailsForm.rank_file
+        ? {
+            document_url: detailsForm.rank_file,
+            ...(detailsForm.rank_file_added_at ? { added_at: detailsForm.rank_file_added_at } : {})
+          }
+        : null,
       fee_document: detailsForm.fee_document
         ? {
-            document_url: detailsForm.fee_document,
-            added_at: detailsForm.fee_document_added_at || new Date().toISOString()
-          }
+          document_url: detailsForm.fee_document,
+          added_at: detailsForm.fee_document_added_at || new Date().toISOString()
+        }
         : null,
       technical_document: detailsForm.technical_document
         ? {
-            document_url: detailsForm.technical_document,
-            added_at: detailsForm.technical_document_added_at || new Date().toISOString()
-          }
+          document_url: detailsForm.technical_document,
+          added_at: detailsForm.technical_document_added_at || new Date().toISOString()
+        }
         : null,
       boq_filled: detailsForm.boq_filled
         ? {
-            document_url: detailsForm.boq_filled,
-            added_at: detailsForm.boq_filled_added_at || new Date().toISOString()
-          }
+          document_url: detailsForm.boq_filled,
+          added_at: detailsForm.boq_filled_added_at || new Date().toISOString()
+        }
         : null,
       courier: {
         courier_status: !!detailsForm.courier?.courier_status,
@@ -834,15 +851,15 @@ export default function TendersListView() {
       },
       submit_to_govt_portal_slip: detailsForm.submit_to_govt_portal_slip
         ? {
-            document_url: detailsForm.submit_to_govt_portal_slip,
-            ...(detailsForm.submit_to_govt_portal_slip_added_at ? { added_at: detailsForm.submit_to_govt_portal_slip_added_at } : {})
-          }
+          document_url: detailsForm.submit_to_govt_portal_slip,
+          ...(detailsForm.submit_to_govt_portal_slip_added_at ? { added_at: detailsForm.submit_to_govt_portal_slip_added_at } : {})
+        }
         : null,
       a9slip: detailsForm.a9slip
         ? {
-            document_url: detailsForm.a9slip,
-            ...(detailsForm.a9slip_added_at ? { added_at: detailsForm.a9slip_added_at } : {})
-          }
+          document_url: detailsForm.a9slip,
+          ...(detailsForm.a9slip_added_at ? { added_at: detailsForm.a9slip_added_at } : {})
+        }
         : null,
       counter_offer: {
         enabled: detailsForm.counter_offer.enabled,
@@ -2168,24 +2185,8 @@ export default function TendersListView() {
                                 {detailsForm.docs_resubmitted.map((doc, idx) => (
                                   <div key={idx} className="flex gap-3 items-end bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
                                     <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                      {/* Document Name Dropdown */}
-                                      <div>
-                                        <label className="block text-[10px] font-bold text-slate-505 uppercase mb-1">Document Name <span className="text-rose-500">*</span></label>
-                                        <select
-                                          value={doc.name}
-                                          onChange={(e) => handleDocsResubmittedChange(idx, 'name', e.target.value)}
-                                          required
-                                          disabled={isTenderCompleted}
-                                          className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded text-xs focus:outline-none focus:border-sky-505 text-slate-800"
-                                        >
-                                          {DOCUMENT_NAMES.map(name => (
-                                            <option key={name} value={name}>{name}</option>
-                                          ))}
-                                        </select>
-                                      </div>
-
                                       {/* Document PDF Upload */}
-                                      <div>
+                                      <div className={!(doc.document_url || doc.url) ? "col-span-1 sm:col-span-2" : ""}>
                                         <label className="block text-[10px] font-bold text-slate-505 uppercase mb-1">Document PDF <span className="text-rose-500">*</span></label>
                                         <div className="flex items-center gap-2">
                                           {doc.uploading ? (
@@ -2196,7 +2197,7 @@ export default function TendersListView() {
                                               </svg>
                                               Uploading PDF...
                                             </div>
-                                          ) : doc.url ? (
+                                          ) : (doc.document_url || doc.url) ? (
                                             <div className="flex-1 flex items-center justify-between bg-white border border-emerald-100 rounded px-2.5 py-1.5 text-xs text-emerald-700 font-medium truncate">
                                               <span className="truncate flex items-center gap-1">
                                                 <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -2205,7 +2206,7 @@ export default function TendersListView() {
                                                 {doc.fileName || 'Uploaded.pdf'}
                                               </span>
                                               <a
-                                                href={doc.url}
+                                                href={doc.document_url || doc.url}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 className="text-[10px] text-sky-500 hover:text-sky-600 font-bold ml-2 shrink-0 uppercase"
@@ -2226,7 +2227,7 @@ export default function TendersListView() {
                                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                                 </svg>
-                                                {doc.url ? 'Replace' : 'Upload'}
+                                                {(doc.document_url || doc.url) ? 'Replace' : 'Upload'}
                                               </label>
                                               <input
                                                 id={`details-docs-resubmitted-upload-${idx}`}
@@ -2245,6 +2246,22 @@ export default function TendersListView() {
                                           <p className="text-[10px] text-rose-500 font-medium mt-1">{doc.error}</p>
                                         )}
                                       </div>
+
+                                      {/* Document Reason Text Input */}
+                                      {(doc.document_url || doc.url) && (
+                                        <div className="animate-fadeIn">
+                                          <label className="block text-[10px] font-bold text-slate-550 uppercase mb-1">What changes have been done? <span className="text-rose-500">*</span></label>
+                                          <input
+                                            type="text"
+                                            value={doc.reason || ''}
+                                            onChange={(e) => handleDocsResubmittedChange(idx, 'reason', e.target.value)}
+                                            required
+                                            disabled={isTenderCompleted}
+                                            placeholder="e.g. Corrected signature error on page 4"
+                                            className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded text-xs focus:outline-none focus:border-sky-505 text-slate-800 disabled:bg-slate-50 disabled:text-slate-550"
+                                          />
+                                        </div>
+                                      )}
                                     </div>
 
                                     {!isTenderCompleted && (
@@ -2271,7 +2288,7 @@ export default function TendersListView() {
 
                         {/* Upload Rank (Excel) */}
                         <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
-                          {renderSingleFileUploadDetails('rank_file', 'Upload Rank (Excel File)', '.xlsx,.xls')}
+                          {renderSingleFileUploadDetails('rank_file', 'Upload BOQ Comparative Chart (Excel File)', '.xlsx,.xls')}
                         </div>
 
                         {/* Counter Offer Toggle */}
@@ -2526,11 +2543,18 @@ export default function TendersListView() {
                             <div className="space-y-2">
                               <span className="block text-[10px] font-bold text-slate-400 uppercase">Resubmitted Documents</span>
                               {selectedTender.docs_resubmitted && selectedTender.docs_resubmitted.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="space-y-2">
                                   {selectedTender.docs_resubmitted.map((doc, idx) => (
-                                    <div key={idx} className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
-                                      <span className="truncate pr-2">{doc.name}</span>
-                                      <a href={doc.url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-150 rounded-lg p-3 text-xs font-medium text-slate-700 animate-fadeIn">
+                                      <div className="flex-1 min-w-0">
+                                        <span className="block font-bold text-slate-800 truncate">{doc.document_name || doc.name || 'Uploaded Document'}</span>
+                                        {doc.reason && (
+                                          <span className="block text-[11px] text-slate-505 text-slate-500 font-normal mt-1 bg-slate-50/50 p-1.5 rounded border border-slate-100/50">
+                                            <span className="font-semibold text-slate-600">Changes:</span> {doc.reason}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <a href={doc.document_url || doc.url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0 self-end sm:self-center">View File</a>
                                     </div>
                                   ))}
                                 </div>
@@ -2546,9 +2570,23 @@ export default function TendersListView() {
                           <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl flex items-center justify-between">
                             <div>
                               <span className="block text-[10px] font-bold text-slate-400 uppercase">Tender Rank File</span>
-                              <span className="text-xs font-semibold text-slate-700">{selectedTender.rank_file.split('/').pop() || 'Rank File.xlsx'}</span>
+                              <span className="text-xs font-semibold text-slate-700">
+                                {(() => {
+                                  const url = typeof selectedTender.rank_file === 'object'
+                                    ? selectedTender.rank_file?.document_url
+                                    : selectedTender.rank_file;
+                                  return url ? url.split('/').pop() : 'Rank File.xlsx';
+                                })()}
+                              </span>
                             </div>
-                            <a href={selectedTender.rank_file} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-xs">Download Excel</a>
+                            <a
+                              href={typeof selectedTender.rank_file === 'object' ? selectedTender.rank_file?.document_url : selectedTender.rank_file}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-xs"
+                            >
+                              Download Excel
+                            </a>
                           </div>
                         ) : null}
 
