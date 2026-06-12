@@ -88,6 +88,15 @@ export default function TendersListView() {
     docs_resubmitted: [],
     rank_file: '',
     rank_fileName: '',
+    fee_document: '',
+    fee_document_fileName: '',
+    fee_document_added_at: '',
+    technical_document: '',
+    technical_document_fileName: '',
+    technical_document_added_at: '',
+    boq_filled: '',
+    boq_filled_fileName: '',
+    boq_filled_added_at: '',
     counter_offer: {
       enabled: false,
       documents: []
@@ -360,6 +369,15 @@ export default function TendersListView() {
         : [],
       rank_file: tender.rank_file || '',
       rank_fileName: tender.rank_file ? (tender.rank_file_name || tender.rank_file.split('/').pop()) : '',
+      fee_document: (tender.fee_document && typeof tender.fee_document === 'object') ? (tender.fee_document.document_url || '') : '',
+      fee_document_fileName: (tender.fee_document && typeof tender.fee_document === 'object' && tender.fee_document.document_url) ? tender.fee_document.document_url.split('/').pop() : '',
+      fee_document_added_at: (tender.fee_document && typeof tender.fee_document === 'object') ? (tender.fee_document.added_at || '') : '',
+      technical_document: (tender.technical_document && typeof tender.technical_document === 'object') ? (tender.technical_document.document_url || '') : '',
+      technical_document_fileName: (tender.technical_document && typeof tender.technical_document === 'object' && tender.technical_document.document_url) ? tender.technical_document.document_url.split('/').pop() : '',
+      technical_document_added_at: (tender.technical_document && typeof tender.technical_document === 'object') ? (tender.technical_document.added_at || '') : '',
+      boq_filled: (tender.boq_filled && typeof tender.boq_filled === 'object') ? (tender.boq_filled.document_url || '') : '',
+      boq_filled_fileName: (tender.boq_filled && typeof tender.boq_filled === 'object' && tender.boq_filled.document_url) ? tender.boq_filled.document_url.split('/').pop() : '',
+      boq_filled_added_at: (tender.boq_filled && typeof tender.boq_filled === 'object') ? (tender.boq_filled.added_at || '') : '',
       counter_offer: (() => {
         if (!tender.counter_offer || typeof tender.counter_offer !== 'object') {
           return { enabled: false, documents: [] };
@@ -418,6 +436,15 @@ export default function TendersListView() {
         }));
         return;
       }
+    } else if (field === 'boq_filled') {
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext !== 'xlsx' && ext !== 'xls') {
+        setDetailsUploadProgress(prev => ({
+          ...prev,
+          [field]: { uploading: false, error: 'Only Excel (.xlsx, .xls) files are allowed for BOQ.' }
+        }));
+        return;
+      }
     } else {
       if (file.type !== 'application/pdf') {
         setDetailsUploadProgress(prev => ({
@@ -464,7 +491,8 @@ export default function TendersListView() {
           return {
             ...prev,
             [field]: url,
-            [`${field}_fileName`]: file.name
+            [`${field}_fileName`]: file.name,
+            [`${field}_added_at`]: ''
           };
         });
         setDetailsUploadProgress(prev => ({
@@ -554,6 +582,7 @@ export default function TendersListView() {
           docs[index].url = url;
           docs[index].uploading = false;
           docs[index].error = '';
+          docs[index].added_at = '';
           return { ...prev, docs_resubmitted: docs };
         });
       } else {
@@ -722,9 +751,31 @@ export default function TendersListView() {
       id: selectedTender.id,
       shortfall: detailsForm.shortfall,
       docs_resubmitted: detailsForm.shortfall
-        ? detailsForm.docs_resubmitted.map(d => ({ name: d.name, url: d.url }))
+        ? detailsForm.docs_resubmitted.map(d => ({
+            name: d.name,
+            url: d.url,
+            added_at: d.added_at || new Date().toISOString()
+          }))
         : [],
       rank_file: detailsForm.rank_file || null,
+      fee_document: detailsForm.fee_document
+        ? {
+            document_url: detailsForm.fee_document,
+            added_at: detailsForm.fee_document_added_at || new Date().toISOString()
+          }
+        : null,
+      technical_document: detailsForm.technical_document
+        ? {
+            document_url: detailsForm.technical_document,
+            added_at: detailsForm.technical_document_added_at || new Date().toISOString()
+          }
+        : null,
+      boq_filled: detailsForm.boq_filled
+        ? {
+            document_url: detailsForm.boq_filled,
+            added_at: detailsForm.boq_filled_added_at || new Date().toISOString()
+          }
+        : null,
       counter_offer: {
         enabled: detailsForm.counter_offer.enabled,
         documents: detailsForm.counter_offer.enabled
@@ -767,6 +818,9 @@ export default function TendersListView() {
             shortfall: payload.shortfall,
             docs_resubmitted: payload.docs_resubmitted,
             rank_file: payload.rank_file,
+            fee_document: payload.fee_document,
+            technical_document: payload.technical_document,
+            boq_filled: payload.boq_filled,
             counter_offer: payload.counter_offer,
             loi: payload.loi,
             po: payload.po,
@@ -837,7 +891,7 @@ export default function TendersListView() {
                   <button
                     type="button"
                     onClick={() => {
-                      setDetailsForm(prev => ({ ...prev, [field]: '', [`${field}_fileName`]: '' }));
+                      setDetailsForm(prev => ({ ...prev, [field]: '', [`${field}_fileName`]: '', [`${field}_added_at`]: '' }));
                     }}
                     className="text-rose-500 hover:text-rose-600 p-0.5 rounded cursor-pointer"
                     title="Remove file"
@@ -1921,6 +1975,18 @@ export default function TendersListView() {
                       <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Update Assigned Tender Details</h3>
 
                       <div className="space-y-4">
+                        {/* Tender Required Documents Upload (Fee, Technical, BOQ) */}
+                        <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-4">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Tender Submission Documents</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {renderSingleFileUploadDetails('fee_document', 'Fee Document (PDF)', '.pdf')}
+                            {renderSingleFileUploadDetails('technical_document', 'Technical Document (PDF)', '.pdf')}
+                            <div className="md:col-span-2">
+                              {renderSingleFileUploadDetails('boq_filled', 'BOQ Filled (Excel/PDF)', '.pdf,.xlsx,.xls')}
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Shortfall Toggle */}
                         <div className="space-y-3 p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
                           <div className="flex items-center justify-between">
@@ -2311,6 +2377,33 @@ export default function TendersListView() {
                                 </div>
                               ) : (
                                 <span className="text-xs text-slate-400 italic">No counter offer documents uploaded.</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* Tender Submission Documents */}
+                        {(selectedTender.fee_document || selectedTender.technical_document || selectedTender.boq_filled) ? (
+                          <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
+                            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Tender Submission Documents</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {selectedTender.fee_document?.document_url && (
+                                <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                  <span className="truncate pr-2">Fee Document</span>
+                                  <a href={selectedTender.fee_document.document_url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                </div>
+                              )}
+                              {selectedTender.technical_document?.document_url && (
+                                <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                  <span className="truncate pr-2">Technical Document</span>
+                                  <a href={selectedTender.technical_document.document_url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                </div>
+                              )}
+                              {selectedTender.boq_filled?.document_url && (
+                                <div className="col-span-1 sm:col-span-2 flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                  <span className="truncate pr-2">BOQ Filled</span>
+                                  <a href={selectedTender.boq_filled.document_url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                </div>
                               )}
                             </div>
                           </div>
