@@ -799,7 +799,7 @@ export default function MDDashboard() {
                       <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-full">Enabled</span>
                     </div>
 
-                    {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md) && (
+                    {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md_at) && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800 pt-3 animate-fadeIn">
                         {selectedTender.counter_offer?.sent_for_approval && (
                           <div>
@@ -809,12 +809,18 @@ export default function MDDashboard() {
                             </span>
                           </div>
                         )}
-                        {selectedTender.counter_offer?.counter_offer_approve_by_md && (
+                        {selectedTender.counter_offer?.counter_offer_approve_by_md_at && (
                           <div>
                             <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">MD Approval Status</span>
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                              Approved {selectedTender.counter_offer.counter_offer_approve_by_md_at ? `at ${new Date(selectedTender.counter_offer.counter_offer_approve_by_md_at).toLocaleString()}` : ''}
-                            </span>
+                            {selectedTender.counter_offer.counter_offer_approve_by_md ? (
+                              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                Approved {selectedTender.counter_offer.counter_offer_approve_by_md_at ? `at ${new Date(selectedTender.counter_offer.counter_offer_approve_by_md_at).toLocaleString()}` : ''}
+                              </span>
+                            ) : (
+                              <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                                Rejected {selectedTender.counter_offer.counter_offer_approve_by_md_at ? `at ${new Date(selectedTender.counter_offer.counter_offer_approve_by_md_at).toLocaleString()}` : ''}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -825,9 +831,9 @@ export default function MDDashboard() {
                       {selectedTender.counter_offer.documents && selectedTender.counter_offer.documents.length > 0 ? (
                         <div className="space-y-2">
                           {selectedTender.counter_offer.documents.map((doc, idx) => (
-                            <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg p-3 text-xs font-medium text-slate-700 dark:text-slate-300 animate-fadeIn">
+                            <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg p-3 text-xs font-medium text-slate-700 dark:text-slate-355 animate-fadeIn">
                               <div className="flex-1 min-w-0">
-                                <span className="block font-bold text-slate-800 dark:text-slate-200 truncate">{doc.fileName || doc.url?.split('/').pop() || 'Uploaded Document'}</span>
+                                <span className="block font-bold text-slate-850 dark:text-slate-200 truncate">{doc.fileName || doc.url?.split('/').pop() || 'Uploaded Document'}</span>
                                 {doc.remark && (
                                   <span className="block text-[11px] text-slate-500 dark:text-slate-400 font-normal mt-1 bg-slate-50/50 dark:bg-slate-850 p-1.5 rounded border border-slate-100/50 dark:border-slate-800/50">
                                     <span className="font-semibold text-slate-600 dark:text-slate-300">Remark:</span> {doc.remark}
@@ -842,6 +848,30 @@ export default function MDDashboard() {
                         <span className="text-xs text-slate-400 italic">No counter offer documents uploaded.</span>
                       )}
                     </div>
+
+                    {(selectedTender.counter_offer?.acceptance_pdf || selectedTender.counter_offer?.non_acceptance_pdf) && (
+                      <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+                        <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Acceptance/Non Acceptance of Counter Offer File</span>
+                        {selectedTender.counter_offer?.acceptance_pdf && (
+                          <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg p-3 text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center justify-between animate-fadeIn">
+                            <div className="flex-1 min-w-0">
+                              <span className="block font-bold text-slate-800 dark:text-slate-200">Acceptance Counter Offer PDF</span>
+                              <span className="block text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{selectedTender.counter_offer.acceptance_pdf.split('/').pop()}</span>
+                            </div>
+                            <a href={selectedTender.counter_offer.acceptance_pdf} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                          </div>
+                        )}
+                        {selectedTender.counter_offer?.non_acceptance_pdf && (
+                          <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg p-3 text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center justify-between animate-fadeIn">
+                            <div className="flex-1 min-w-0">
+                              <span className="block font-bold text-slate-800 dark:text-slate-200">Non Acceptance Counter Offer PDF</span>
+                              <span className="block text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{selectedTender.counter_offer.non_acceptance_pdf.split('/').pop()}</span>
+                            </div>
+                            <a href={selectedTender.counter_offer.non_acceptance_pdf} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : null}
 

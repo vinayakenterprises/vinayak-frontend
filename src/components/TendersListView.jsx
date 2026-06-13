@@ -118,7 +118,9 @@ export default function TendersListView() {
       sent_for_approval: false,
       sent_for_approval_at: '',
       counter_offer_approve_by_md: false,
-      counter_offer_approve_by_md_at: null
+      counter_offer_approve_by_md_at: null,
+      acceptance_pdf: '',
+      non_acceptance_pdf: ''
     },
     loi: '',
     loi_fileName: '',
@@ -441,7 +443,9 @@ export default function TendersListView() {
             sent_for_approval: false,
             sent_for_approval_at: '',
             counter_offer_approve_by_md: false,
-            counter_offer_approve_by_md_at: null
+            counter_offer_approve_by_md_at: null,
+            acceptance_pdf: '',
+            non_acceptance_pdf: ''
           };
         }
         const enabled = tender.counter_offer.counter_offer !== undefined
@@ -452,6 +456,8 @@ export default function TendersListView() {
         const sent_for_approval_at = tender.counter_offer.sent_for_approval_at || '';
         const counter_offer_approve_by_md = !!tender.counter_offer.counter_offer_approve_by_md;
         const counter_offer_approve_by_md_at = tender.counter_offer.counter_offer_approve_by_md_at || null;
+        const acceptance_pdf = tender.counter_offer.acceptance_pdf || '';
+        const non_acceptance_pdf = tender.counter_offer.non_acceptance_pdf || '';
 
         let documents = [];
         if (Array.isArray(tender.counter_offer.documents)) {
@@ -478,7 +484,9 @@ export default function TendersListView() {
           sent_for_approval,
           sent_for_approval_at,
           counter_offer_approve_by_md,
-          counter_offer_approve_by_md_at
+          counter_offer_approve_by_md_at,
+          acceptance_pdf,
+          non_acceptance_pdf
         };
       })(),
       loi: tender.loi || '',
@@ -913,7 +921,9 @@ export default function TendersListView() {
               url: d.url || '',
               remark: d.remark || ''
             }))
-          : []
+          : [],
+        acceptance_pdf: detailsForm.counter_offer.acceptance_pdf || null,
+        non_acceptance_pdf: detailsForm.counter_offer.non_acceptance_pdf || null
       },
       loi: detailsForm.loi || null,
       po: detailsForm.po || null,
@@ -1065,6 +1075,160 @@ export default function TendersListView() {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleDetailsSingleFileUpload(field, file);
+                }}
+              />
+            </div>
+          )}
+        </div>
+        {progress.error && (
+          <p className="text-[10px] text-rose-500 font-semibold mt-0.5">{progress.error}</p>
+        )}
+      </div>
+    );
+  };
+
+  const renderCounterOfferSingleFileUpload = (subField, label) => {
+    const fileUrl = detailsForm.counter_offer[subField];
+    const fileName = fileUrl ? fileUrl.split('/').pop() : '';
+    const progress = detailsUploadProgress[subField] || {};
+    const isCompleted = isTenderCompleted;
+
+    const handleUpload = (file) => {
+      if (!file) return;
+      if (file.type !== 'application/pdf') {
+        setDetailsUploadProgress(prev => ({
+          ...prev,
+          [subField]: { uploading: false, error: 'Only PDF files (.pdf) are allowed.' }
+        }));
+        return;
+      }
+
+      setDetailsUploadProgress(prev => ({
+        ...prev,
+        [subField]: { uploading: true, error: '', fileName: file.name }
+      }));
+
+      const token = localStorage.getItem('token') || '';
+      const uploadFormData = new FormData();
+      uploadFormData.append('pdf-file', file);
+
+      fetch(`${API_BASE_URL}/api/v1/tenders/upload-document`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadFormData
+      })
+      .then(res => res.json())
+      .then(resData => {
+        if (resData?.status === 'success') {
+          const url = resData.data.url;
+          setDetailsForm(prev => ({
+            ...prev,
+            counter_offer: {
+              ...prev.counter_offer,
+              [subField]: url
+            }
+          }));
+          setDetailsUploadProgress(prev => ({
+            ...prev,
+            [subField]: { uploading: false, error: '', fileName: file.name }
+          }));
+        } else {
+          const error = resData?.message || resData?.error || 'Upload failed';
+          setDetailsUploadProgress(prev => ({
+            ...prev,
+            [subField]: { uploading: false, error }
+          }));
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        setDetailsUploadProgress(prev => ({
+          ...prev,
+          [subField]: { uploading: false, error: `Upload error: ${err.message || err}` }
+        }));
+      });
+    };
+
+    return (
+      <div className="space-y-1.5 mt-3 text-left">
+        <label className="block text-xs font-bold text-slate-705 uppercase tracking-wide">
+          {label} <span className="text-rose-500">*</span>
+        </label>
+        <div className="flex items-center gap-2">
+          {progress.uploading ? (
+            <div className="flex-1 flex items-center gap-1.5 py-2 px-3 border border-slate-200 rounded-lg text-xs text-slate-500 font-medium bg-slate-50/50">
+              <svg className="animate-spin h-3.5 w-3.5 text-sky-500" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Uploading...
+            </div>
+          ) : fileUrl ? (
+            <div className="flex-1 flex items-center justify-between bg-emerald-50/70 border border-emerald-100 rounded-lg px-3 py-1.5 text-xs text-emerald-800 font-medium truncate">
+              <span className="truncate flex items-center gap-1.5">
+                <svg className="w-4.5 h-4.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                {fileName || 'Uploaded file'}
+              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] text-sky-500 hover:text-sky-655 font-bold uppercase"
+                >
+                  View
+                </a>
+                {!isCompleted && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDetailsForm(prev => ({
+                        ...prev,
+                        counter_offer: {
+                          ...prev.counter_offer,
+                          [subField]: ''
+                        }
+                      }));
+                    }}
+                    className="text-rose-500 hover:text-rose-600 p-0.5 rounded cursor-pointer"
+                    title="Remove file"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 text-slate-400 italic text-xs py-2 px-3 border border-slate-150 border-dashed rounded-lg bg-slate-50/20 select-none">
+              No file uploaded
+            </div>
+          )}
+
+          {!progress.uploading && !isCompleted && (
+            <div>
+              <label
+                htmlFor={`counter-offer-file-upload-${subField}`}
+                className="cursor-pointer bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-sky-600 hover:bg-sky-50/50 hover:border-sky-300 transition-all font-semibold shadow-xs flex items-center gap-1.5 shrink-0 whitespace-nowrap h-[34px] flex items-center"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                {fileUrl ? 'Replace' : 'Upload'}
+              </label>
+              <input
+                id={`counter-offer-file-upload-${subField}`}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUpload(file);
                 }}
               />
             </div>
@@ -2489,18 +2653,44 @@ export default function TendersListView() {
 
                                 {/* MD Approval status indication banner */}
                                 {detailsForm.counter_offer.counter_offer_approve_by_md && (
-                                  <div className="flex justify-between items-center bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-lg p-3 text-xs font-bold animate-fadeIn mt-2">
-                                    <span className="flex items-center gap-1.5">
-                                      <svg className="w-4.5 h-4.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                      </svg>
-                                      This counter offer has been approved.
-                                    </span>
-                                    {detailsForm.counter_offer.counter_offer_approve_by_md_at && (
-                                      <span className="text-[10px] text-emerald-600 font-semibold">
-                                        Approved At: {new Date(detailsForm.counter_offer.counter_offer_approve_by_md_at).toLocaleString()}
+                                  <div className="space-y-3 mt-2 animate-fadeIn">
+                                    <div className="flex justify-between items-center bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-lg p-3 text-xs font-bold">
+                                      <span className="flex items-center gap-1.5">
+                                        <svg className="w-4.5 h-4.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        This counter offer has been approved.
                                       </span>
-                                    )}
+                                      {detailsForm.counter_offer.counter_offer_approve_by_md_at && (
+                                        <span className="text-[10px] text-emerald-600 font-semibold">
+                                          Approved At: {new Date(detailsForm.counter_offer.counter_offer_approve_by_md_at).toLocaleString()}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {/* Upload box for Acceptance Counter Offer PDF */}
+                                    <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                                      {renderCounterOfferSingleFileUpload('acceptance_pdf', 'Acceptance Counter Offer PDF')}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {detailsForm.counter_offer.counter_offer_approve_by_md === false && detailsForm.counter_offer.counter_offer_approve_by_md_at != null && (
+                                  <div className="space-y-3 mt-2 animate-fadeIn">
+                                    <div className="flex justify-between items-center bg-rose-50 text-rose-800 border border-rose-100 rounded-lg p-3 text-xs font-bold">
+                                      <span className="flex items-center gap-1.5">
+                                        <svg className="w-4.5 h-4.5 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        This counter offer has been rejected.
+                                      </span>
+                                      <span className="text-[10px] text-rose-600 font-semibold">
+                                        Rejected At: {new Date(detailsForm.counter_offer.counter_offer_approve_by_md_at).toLocaleString()}
+                                      </span>
+                                    </div>
+                                    {/* Upload box for Non Acceptance Counter Offer PDF */}
+                                    <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                                      {renderCounterOfferSingleFileUpload('non_acceptance_pdf', 'Non Acceptance Counter Offer PDF')}
+                                    </div>
                                   </div>
                                 )}
 
@@ -2514,7 +2704,7 @@ export default function TendersListView() {
                                   <button
                                     type="button"
                                     onClick={handleSendCounterOfferForApproval}
-                                    disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval || detailsForm.counter_offer.counter_offer_approve_by_md || detailsForm.counter_offer.documents.length === 0 || detailsForm.counter_offer.documents.some(d => !d.url || d.uploading)}
+                                    disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval || detailsForm.counter_offer.counter_offer_approve_by_md || detailsForm.counter_offer.counter_offer_approve_by_md_at != null || detailsForm.counter_offer.documents.length === 0 || detailsForm.counter_offer.documents.some(d => !d.url || d.uploading)}
                                     className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
                                   >
                                     {detailsForm.counter_offer.sent_for_approval ? 'Sent For Approval' : 'Send For Approval'}
