@@ -5,6 +5,7 @@ const TABS = [
   { id: 'Active Tenders', label: 'Active Tenders', statusValue: 'Active' },
   { id: 'Pending MD Approval', label: 'Pending MD Approval', statusValue: 'Pending MD Approval' },
   { id: 'Rejected Tender', label: 'Rejected Tender', statusValue: 'Rejected' },
+  { id: 'Counter Offer Rejected Tenders', label: 'Counter Offer Rejected', statusValue: 'CounterOfferRejected' },
   { id: 'Shortfall Raised', label: 'Shortfall Raised', statusValue: 'Shortfall Raised' },
   { id: 'Submitted Tenders', label: 'Complete Tenders', statusValue: 'Submitted' },
   { id: 'Approved By MD Tenders', label: 'Approved By MD Tenders', statusValue: 'ApprovedByMDTenders' }
@@ -174,6 +175,7 @@ export default function TendersListView() {
         activeList,
         pendingList,
         rejectedList,
+        counterOfferRejectedAgentList,
         shortfallList,
         completedList,
         approvedList
@@ -181,6 +183,7 @@ export default function TendersListView() {
         safeFetch('get-active-tenders'),
         safeFetch('get-pending-md-approval-tenders'),
         safeFetch('get-rejected-tenders-for-tender-agent'),
+        safeFetch('get-counter-offer-rejected-tender-agent'),
         safeFetch('get-shortfall-tenders'),
         safeFetch('get-completed-tenders-for-tender-agent'),
         safeFetch('get-approved-tenders-for-tender-agent')
@@ -189,6 +192,7 @@ export default function TendersListView() {
       const mappedActive = activeList.map(t => ({ ...t, status: 'Active' }));
       const mappedPending = pendingList.map(t => ({ ...t, status: 'Pending MD Approval' }));
       const mappedRejected = rejectedList.map(t => ({ ...t, status: 'Rejected' }));
+      const mappedCounterOfferRejectedAgent = counterOfferRejectedAgentList.map(t => ({ ...t, status: 'CounterOfferRejected' }));
       const mappedShortfall = shortfallList.map(t => ({ ...t, status: 'Shortfall Raised' }));
       const mappedCompleted = completedList.map(t => ({ ...t, status: 'Submitted' }));
       const mappedApproved = approvedList.map(t => ({ ...t, status: 'ApprovedByMDTenders' }));
@@ -197,6 +201,7 @@ export default function TendersListView() {
         ...mappedActive,
         ...mappedPending,
         ...mappedRejected,
+        ...mappedCounterOfferRejectedAgent,
         ...mappedShortfall,
         ...mappedCompleted,
         ...mappedApproved
@@ -929,8 +934,7 @@ export default function TendersListView() {
       po: detailsForm.po || null,
       contract_agreement: detailsForm.contract_agreement || null,
       warranty: detailsForm.warranty || null,
-      acceptance_letter: detailsForm.acceptance_letter || null,
-      ...(isMarkComplete ? { tender_completed_at: currentTimestamp } : {})
+      acceptance_letter: detailsForm.acceptance_letter || null
     };
 
     const token = localStorage.getItem('token') || '';
@@ -948,10 +952,29 @@ export default function TendersListView() {
       const resData = await response.json().catch(() => null);
 
       if (response.ok && resData?.status === 'success') {
-        const successMsg = isMarkComplete
-          ? 'Tender details updated and marked as complete successfully!'
-          : 'Tender details updated successfully!';
-        setDetailsSaveSuccess(successMsg);
+        let completedAt = null;
+
+        if (isMarkComplete) {
+          const completeResponse = await fetch(`${API_BASE_URL}/api/v1/tenders/mark-as-complete-tender-after-approved-by-md/${selectedTender.id}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          const completeData = await completeResponse.json().catch(() => null);
+
+          if (completeResponse.ok && completeData?.status === 'success') {
+            completedAt = completeData.data?.tender_completed_at || new Date().toISOString();
+            setDetailsSaveSuccess('Tender details updated and marked as complete successfully!');
+          } else {
+            setDetailsSaveError(completeData?.message || completeData?.error || 'Failed to mark tender as complete.');
+            setIsSavingDetails(false);
+            return;
+          }
+        } else {
+          setDetailsSaveSuccess('Tender details updated successfully!');
+        }
 
         // Refresh local selectedTender so any display in the modal gets synced
         setSelectedTender(prev => {
@@ -974,7 +997,7 @@ export default function TendersListView() {
             contract_agreement: payload.contract_agreement,
             warranty: payload.warranty,
             acceptance_letter: payload.acceptance_letter,
-            tender_completed_at: payload.tender_completed_at || prev.tender_completed_at
+            tender_completed_at: isMarkComplete ? completedAt : prev.tender_completed_at
           };
         });
 
@@ -2125,7 +2148,7 @@ export default function TendersListView() {
       {/* View Tender Details Modal */}
       {isViewModalOpen && selectedTender && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200">
-          <div className={`bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${(activeTab === 'Approved By MD Tenders' || activeTab === 'Submitted Tenders') ? 'max-w-2xl' : 'max-w-lg'} max-h-[90vh] overflow-hidden flex flex-col scale-in duration-150`}>
+          <div className={`bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${(activeTab === 'Approved By MD Tenders' || activeTab === 'Submitted Tenders' || activeTab === 'Counter Offer Rejected Tenders') ? 'max-w-2xl' : 'max-w-lg'} max-h-[90vh] overflow-hidden flex flex-col scale-in duration-150`}>
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-900">Tender Details</h2>
@@ -2734,9 +2757,9 @@ export default function TendersListView() {
                   )}
 
                   {/* Complete Tenders tab read-only view details */}
-                  {activeTab === 'Submitted Tenders' && (
+                  {(activeTab === 'Submitted Tenders' || activeTab === 'Counter Offer Rejected Tenders') && (
                     <div className="border-t border-slate-100 pt-5 space-y-4">
-                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Completed Tender Details</h3>
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{activeTab === 'Counter Offer Rejected Tenders' ? 'Rejected Counter Offer Details' : 'Completed Tender Details'}</h3>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Timestamps */}
@@ -2872,7 +2895,7 @@ export default function TendersListView() {
                               <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full">Enabled</span>
                             </div>
 
-                            {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md) && (
+                            {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md_at) && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-3 animate-fadeIn">
                                 {selectedTender.counter_offer?.sent_for_approval && (
                                   <div>
@@ -2882,11 +2905,11 @@ export default function TendersListView() {
                                     </span>
                                   </div>
                                 )}
-                                {selectedTender.counter_offer?.counter_offer_approve_by_md && (
+                                {selectedTender.counter_offer?.counter_offer_approve_by_md_at && (
                                   <div>
                                     <span className="block text-[10px] font-bold text-slate-400 uppercase">MD Approval Status</span>
-                                    <span className="text-xs font-bold text-emerald-600">
-                                      Approved {selectedTender.counter_offer.counter_offer_approve_by_md_at ? `at ${new Date(selectedTender.counter_offer.counter_offer_approve_by_md_at).toLocaleString()}` : ''}
+                                    <span className={`text-xs font-bold ${selectedTender.counter_offer.counter_offer_approve_by_md ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                      {selectedTender.counter_offer.counter_offer_approve_by_md ? 'Approved' : 'Rejected'} {selectedTender.counter_offer.counter_offer_approve_by_md_at ? `at ${new Date(selectedTender.counter_offer.counter_offer_approve_by_md_at).toLocaleString()}` : ''}
                                     </span>
                                   </div>
                                 )}
@@ -2902,7 +2925,7 @@ export default function TendersListView() {
                                       <div className="flex-1 min-w-0">
                                         <span className="block font-bold text-slate-800 truncate">{doc.fileName || doc.url?.split('/').pop() || 'Uploaded Document'}</span>
                                         {doc.remark && (
-                                          <span className="block text-[11px] text-slate-505 text-slate-500 font-normal mt-1 bg-slate-50/50 p-1.5 rounded border border-slate-100/50">
+                                          <span className="block text-[11px] text-slate-550 text-slate-500 font-normal mt-1 bg-slate-50/50 p-1.5 rounded border border-slate-100/50">
                                             <span className="font-semibold text-slate-600">Remark:</span> {doc.remark}
                                           </span>
                                         )}
@@ -2913,6 +2936,34 @@ export default function TendersListView() {
                                 </div>
                               ) : (
                                 <span className="text-xs text-slate-400 italic">No counter offer documents uploaded.</span>
+                              )}
+
+                              {selectedTender.counter_offer.acceptance_pdf && (
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs font-medium text-emerald-800 animate-fadeIn mt-2">
+                                  <div className="flex-1 min-w-0">
+                                    <span className="block font-bold text-emerald-900 truncate">
+                                      Acceptance Counter Offer PDF
+                                    </span>
+                                    <span className="block text-[10px] text-emerald-600 font-normal mt-0.5 truncate">
+                                      {selectedTender.counter_offer.acceptance_pdf.split('/').pop()}
+                                    </span>
+                                  </div>
+                                  <a href={selectedTender.counter_offer.acceptance_pdf} target="_blank" rel="noreferrer" className="text-[10px] text-emerald-650 hover:text-emerald-700 font-bold uppercase shrink-0 self-end sm:self-center bg-white px-2.5 py-1.5 rounded border border-emerald-250">View File</a>
+                                </div>
+                              )}
+
+                              {selectedTender.counter_offer.non_acceptance_pdf && (
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-rose-50 border border-rose-100 rounded-lg p-3 text-xs font-medium text-rose-800 animate-fadeIn mt-2">
+                                  <div className="flex-1 min-w-0">
+                                    <span className="block font-bold text-rose-900 truncate">
+                                      Non Acceptance Counter Offer PDF
+                                    </span>
+                                    <span className="block text-[10px] text-rose-600 font-normal mt-0.5 truncate">
+                                      {selectedTender.counter_offer.non_acceptance_pdf.split('/').pop()}
+                                    </span>
+                                  </div>
+                                  <a href={selectedTender.counter_offer.non_acceptance_pdf} target="_blank" rel="noreferrer" className="text-[10px] text-rose-650 hover:text-rose-700 font-bold uppercase shrink-0 self-end sm:self-center bg-white px-2.5 py-1.5 rounded border border-rose-200">View File</a>
+                                </div>
                               )}
                             </div>
                           </div>
