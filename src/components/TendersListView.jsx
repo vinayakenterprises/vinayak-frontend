@@ -143,7 +143,10 @@ export default function TendersListView() {
     insurance_added_at: '',
     acceptance_letter: '',
     acceptance_letter_fileName: '',
-    acceptance_letter_added_at: ''
+    acceptance_letter_added_at: '',
+    npv_bond: '',
+    npv_bond_fileName: '',
+    npv_bond_added_at: ''
   });
   const [detailsUploadProgress, setDetailsUploadProgress] = useState({});
   const [isSavingDetails, setIsSavingDetails] = useState(false);
@@ -539,7 +542,12 @@ export default function TendersListView() {
       acceptance_letter_fileName: (tender.acceptance_letter && typeof tender.acceptance_letter === 'object' && tender.acceptance_letter.document_url)
         ? tender.acceptance_letter.document_url.split('/').pop()
         : (typeof tender.acceptance_letter === 'string' ? tender.acceptance_letter.split('/').pop() : ''),
-      acceptance_letter_added_at: (tender.acceptance_letter && typeof tender.acceptance_letter === 'object') ? (tender.acceptance_letter.added_at || '') : ''
+      acceptance_letter_added_at: (tender.acceptance_letter && typeof tender.acceptance_letter === 'object') ? (tender.acceptance_letter.added_at || '') : '',
+      npv_bond: (tender.npv_bond && typeof tender.npv_bond === 'object') ? (tender.npv_bond.document_url || '') : (typeof tender.npv_bond === 'string' ? tender.npv_bond : ''),
+      npv_bond_fileName: (tender.npv_bond && typeof tender.npv_bond === 'object' && tender.npv_bond.document_url)
+        ? tender.npv_bond.document_url.split('/').pop()
+        : (typeof tender.npv_bond === 'string' ? tender.npv_bond.split('/').pop() : ''),
+      npv_bond_added_at: (tender.npv_bond && typeof tender.npv_bond === 'object') ? (tender.npv_bond.added_at || '') : ''
     });
 
     setIsViewModalOpen(true);
@@ -972,7 +980,8 @@ export default function TendersListView() {
       warranty: detailsForm.warranty ? { document_url: detailsForm.warranty, added_at: detailsForm.warranty_added_at || new Date().toISOString() } : null,
       pbg: detailsForm.pbg ? { document_url: detailsForm.pbg, added_at: detailsForm.pbg_added_at || new Date().toISOString() } : null,
       insurance: detailsForm.insurance ? { document_url: detailsForm.insurance, added_at: detailsForm.insurance_added_at || new Date().toISOString() } : null,
-      acceptance_letter: detailsForm.acceptance_letter ? { document_url: detailsForm.acceptance_letter, added_at: detailsForm.acceptance_letter_added_at || new Date().toISOString() } : null
+      acceptance_letter: detailsForm.acceptance_letter ? { document_url: detailsForm.acceptance_letter, added_at: detailsForm.acceptance_letter_added_at || new Date().toISOString() } : null,
+      npv_bond: detailsForm.npv_bond ? { document_url: detailsForm.npv_bond, added_at: detailsForm.npv_bond_added_at || new Date().toISOString() } : null
     };
 
     const token = localStorage.getItem('token') || '';
@@ -1037,6 +1046,7 @@ export default function TendersListView() {
             pbg: payload.pbg,
             insurance: payload.insurance,
             acceptance_letter: payload.acceptance_letter,
+            npv_bond: payload.npv_bond,
             tender_completed_at: isMarkComplete ? completedAt : prev.tender_completed_at
           };
         });
@@ -2796,6 +2806,7 @@ export default function TendersListView() {
                             {renderSingleFileUploadDetails('pbg', 'PBG (Performance Bank Guarantee)', '.pdf')}
                             {renderSingleFileUploadDetails('insurance', 'Insurance', '.pdf')}
                             {renderSingleFileUploadDetails('acceptance_letter', 'Acceptance Letter', '.pdf')}
+                            {renderSingleFileUploadDetails('npv_bond', 'NPV Bond', '.pdf')}
                           </div>
                         </div>
                       </div>
@@ -3051,8 +3062,9 @@ export default function TendersListView() {
                           const pbgUrl = typeof selectedTender.pbg === 'object' ? selectedTender.pbg?.document_url : selectedTender.pbg;
                           const insuranceUrl = typeof selectedTender.insurance === 'object' ? selectedTender.insurance?.document_url : selectedTender.insurance;
                           const acceptanceUrl = typeof selectedTender.acceptance_letter === 'object' ? selectedTender.acceptance_letter?.document_url : selectedTender.acceptance_letter;
+                          const npvBondUrl = typeof selectedTender.npv_bond === 'object' ? selectedTender.npv_bond?.document_url : selectedTender.npv_bond;
 
-                          if (!loiUrl && !poUrl && !contractUrl && !warrantyUrl && !pbgUrl && !insuranceUrl && !acceptanceUrl) return null;
+                          if (!loiUrl && !poUrl && !contractUrl && !warrantyUrl && !pbgUrl && !insuranceUrl && !acceptanceUrl && !npvBondUrl) return null;
 
                           return (
                             <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
@@ -3098,6 +3110,12 @@ export default function TendersListView() {
                                   <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
                                     <span className="truncate pr-2">Acceptance Letter</span>
                                     <a href={acceptanceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                  </div>
+                                )}
+                                {npvBondUrl && (
+                                  <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                    <span className="truncate pr-2">NPV Bond</span>
+                                    <a href={npvBondUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
                                   </div>
                                 )}
                               </div>
