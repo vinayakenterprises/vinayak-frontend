@@ -125,14 +125,25 @@ export default function TendersListView() {
     },
     loi: '',
     loi_fileName: '',
+    loi_added_at: '',
     po: '',
     po_fileName: '',
+    po_added_at: '',
     contract_agreement: '',
     contract_agreement_fileName: '',
+    contract_agreement_added_at: '',
     warranty: '',
     warranty_fileName: '',
+    warranty_added_at: '',
+    pbg: '',
+    pbg_fileName: '',
+    pbg_added_at: '',
+    insurance: '',
+    insurance_fileName: '',
+    insurance_added_at: '',
     acceptance_letter: '',
-    acceptance_letter_fileName: ''
+    acceptance_letter_fileName: '',
+    acceptance_letter_added_at: ''
   });
   const [detailsUploadProgress, setDetailsUploadProgress] = useState({});
   const [isSavingDetails, setIsSavingDetails] = useState(false);
@@ -494,16 +505,41 @@ export default function TendersListView() {
           non_acceptance_pdf
         };
       })(),
-      loi: tender.loi || '',
-      loi_fileName: tender.loi ? (tender.loi_name || tender.loi.split('/').pop()) : '',
-      po: tender.po || '',
-      po_fileName: tender.po ? (tender.po_name || tender.po.split('/').pop()) : '',
-      contract_agreement: tender.contract_agreement || '',
-      contract_agreement_fileName: tender.contract_agreement ? (tender.contract_agreement_name || tender.contract_agreement.split('/').pop()) : '',
-      warranty: tender.warranty || '',
-      warranty_fileName: tender.warranty ? (tender.warranty_name || tender.warranty.split('/').pop()) : '',
-      acceptance_letter: tender.acceptance_letter || '',
-      acceptance_letter_fileName: tender.acceptance_letter ? (tender.acceptance_letter_name || tender.acceptance_letter.split('/').pop()) : ''
+      loi: (tender.loi && typeof tender.loi === 'object') ? (tender.loi.document_url || '') : (typeof tender.loi === 'string' ? tender.loi : ''),
+      loi_fileName: (tender.loi && typeof tender.loi === 'object' && tender.loi.document_url)
+        ? tender.loi.document_url.split('/').pop()
+        : (typeof tender.loi === 'string' ? tender.loi.split('/').pop() : ''),
+      loi_added_at: (tender.loi && typeof tender.loi === 'object') ? (tender.loi.added_at || '') : '',
+      po: (tender.po && typeof tender.po === 'object') ? (tender.po.document_url || '') : (typeof tender.po === 'string' ? tender.po : ''),
+      po_fileName: (tender.po && typeof tender.po === 'object' && tender.po.document_url)
+        ? tender.po.document_url.split('/').pop()
+        : (typeof tender.po === 'string' ? tender.po.split('/').pop() : ''),
+      po_added_at: (tender.po && typeof tender.po === 'object') ? (tender.po.added_at || '') : '',
+      contract_agreement: (tender.contract_agreement && typeof tender.contract_agreement === 'object') ? (tender.contract_agreement.document_url || '') : (typeof tender.contract_agreement === 'string' ? tender.contract_agreement : ''),
+      contract_agreement_fileName: (tender.contract_agreement && typeof tender.contract_agreement === 'object' && tender.contract_agreement.document_url)
+        ? tender.contract_agreement.document_url.split('/').pop()
+        : (typeof tender.contract_agreement === 'string' ? tender.contract_agreement.split('/').pop() : ''),
+      contract_agreement_added_at: (tender.contract_agreement && typeof tender.contract_agreement === 'object') ? (tender.contract_agreement.added_at || '') : '',
+      warranty: (tender.warranty && typeof tender.warranty === 'object') ? (tender.warranty.document_url || '') : (typeof tender.warranty === 'string' ? tender.warranty : ''),
+      warranty_fileName: (tender.warranty && typeof tender.warranty === 'object' && tender.warranty.document_url)
+        ? tender.warranty.document_url.split('/').pop()
+        : (typeof tender.warranty === 'string' ? tender.warranty.split('/').pop() : ''),
+      warranty_added_at: (tender.warranty && typeof tender.warranty === 'object') ? (tender.warranty.added_at || '') : '',
+      pbg: (tender.pbg && typeof tender.pbg === 'object') ? (tender.pbg.document_url || '') : (typeof tender.pbg === 'string' ? tender.pbg : ''),
+      pbg_fileName: (tender.pbg && typeof tender.pbg === 'object' && tender.pbg.document_url)
+        ? tender.pbg.document_url.split('/').pop()
+        : (typeof tender.pbg === 'string' ? tender.pbg.split('/').pop() : ''),
+      pbg_added_at: (tender.pbg && typeof tender.pbg === 'object') ? (tender.pbg.added_at || '') : '',
+      insurance: (tender.insurance && typeof tender.insurance === 'object') ? (tender.insurance.document_url || '') : (typeof tender.insurance === 'string' ? tender.insurance : ''),
+      insurance_fileName: (tender.insurance && typeof tender.insurance === 'object' && tender.insurance.document_url)
+        ? tender.insurance.document_url.split('/').pop()
+        : (typeof tender.insurance === 'string' ? tender.insurance.split('/').pop() : ''),
+      insurance_added_at: (tender.insurance && typeof tender.insurance === 'object') ? (tender.insurance.added_at || '') : '',
+      acceptance_letter: (tender.acceptance_letter && typeof tender.acceptance_letter === 'object') ? (tender.acceptance_letter.document_url || '') : (typeof tender.acceptance_letter === 'string' ? tender.acceptance_letter : ''),
+      acceptance_letter_fileName: (tender.acceptance_letter && typeof tender.acceptance_letter === 'object' && tender.acceptance_letter.document_url)
+        ? tender.acceptance_letter.document_url.split('/').pop()
+        : (typeof tender.acceptance_letter === 'string' ? tender.acceptance_letter.split('/').pop() : ''),
+      acceptance_letter_added_at: (tender.acceptance_letter && typeof tender.acceptance_letter === 'object') ? (tender.acceptance_letter.added_at || '') : ''
     });
 
     setIsViewModalOpen(true);
@@ -869,9 +905,9 @@ export default function TendersListView() {
         : [],
       rank_file: detailsForm.rank_file
         ? {
-            document_url: detailsForm.rank_file,
-            ...(detailsForm.rank_file_added_at ? { added_at: detailsForm.rank_file_added_at } : {})
-          }
+          document_url: detailsForm.rank_file,
+          ...(detailsForm.rank_file_added_at ? { added_at: detailsForm.rank_file_added_at } : {})
+        }
         : null,
       fee_document: detailsForm.fee_document
         ? {
@@ -923,18 +959,20 @@ export default function TendersListView() {
         ...((counterOfferOverride ? counterOfferOverride.counter_offer_approve_by_md_at : detailsForm.counter_offer.counter_offer_approve_by_md_at) ? { counter_offer_approve_by_md_at: (counterOfferOverride ? counterOfferOverride.counter_offer_approve_by_md_at : detailsForm.counter_offer.counter_offer_approve_by_md_at) } : { counter_offer_approve_by_md_at: null }),
         documents: (counterOfferOverride ? counterOfferOverride.enabled : detailsForm.counter_offer.enabled)
           ? (counterOfferOverride ? counterOfferOverride.documents : detailsForm.counter_offer.documents).map(d => ({
-              url: d.url || '',
-              remark: d.remark || ''
-            }))
+            url: d.url || '',
+            remark: d.remark || ''
+          }))
           : [],
         acceptance_pdf: detailsForm.counter_offer.acceptance_pdf || null,
         non_acceptance_pdf: detailsForm.counter_offer.non_acceptance_pdf || null
       },
-      loi: detailsForm.loi || null,
-      po: detailsForm.po || null,
-      contract_agreement: detailsForm.contract_agreement || null,
-      warranty: detailsForm.warranty || null,
-      acceptance_letter: detailsForm.acceptance_letter || null
+      loi: detailsForm.loi ? { document_url: detailsForm.loi, added_at: detailsForm.loi_added_at || new Date().toISOString() } : null,
+      po: detailsForm.po ? { document_url: detailsForm.po, added_at: detailsForm.po_added_at || new Date().toISOString() } : null,
+      contract_agreement: detailsForm.contract_agreement ? { document_url: detailsForm.contract_agreement, added_at: detailsForm.contract_agreement_added_at || new Date().toISOString() } : null,
+      warranty: detailsForm.warranty ? { document_url: detailsForm.warranty, added_at: detailsForm.warranty_added_at || new Date().toISOString() } : null,
+      pbg: detailsForm.pbg ? { document_url: detailsForm.pbg, added_at: detailsForm.pbg_added_at || new Date().toISOString() } : null,
+      insurance: detailsForm.insurance ? { document_url: detailsForm.insurance, added_at: detailsForm.insurance_added_at || new Date().toISOString() } : null,
+      acceptance_letter: detailsForm.acceptance_letter ? { document_url: detailsForm.acceptance_letter, added_at: detailsForm.acceptance_letter_added_at || new Date().toISOString() } : null
     };
 
     const token = localStorage.getItem('token') || '';
@@ -996,6 +1034,8 @@ export default function TendersListView() {
             po: payload.po,
             contract_agreement: payload.contract_agreement,
             warranty: payload.warranty,
+            pbg: payload.pbg,
+            insurance: payload.insurance,
             acceptance_letter: payload.acceptance_letter,
             tender_completed_at: isMarkComplete ? completedAt : prev.tender_completed_at
           };
@@ -1142,36 +1182,36 @@ export default function TendersListView() {
         },
         body: uploadFormData
       })
-      .then(res => res.json())
-      .then(resData => {
-        if (resData?.status === 'success') {
-          const url = resData.data.url;
-          setDetailsForm(prev => ({
-            ...prev,
-            counter_offer: {
-              ...prev.counter_offer,
-              [subField]: url
-            }
-          }));
+        .then(res => res.json())
+        .then(resData => {
+          if (resData?.status === 'success') {
+            const url = resData.data.url;
+            setDetailsForm(prev => ({
+              ...prev,
+              counter_offer: {
+                ...prev.counter_offer,
+                [subField]: url
+              }
+            }));
+            setDetailsUploadProgress(prev => ({
+              ...prev,
+              [subField]: { uploading: false, error: '', fileName: file.name }
+            }));
+          } else {
+            const error = resData?.message || resData?.error || 'Upload failed';
+            setDetailsUploadProgress(prev => ({
+              ...prev,
+              [subField]: { uploading: false, error }
+            }));
+          }
+        })
+        .catch(err => {
+          console.error(err);
           setDetailsUploadProgress(prev => ({
             ...prev,
-            [subField]: { uploading: false, error: '', fileName: file.name }
+            [subField]: { uploading: false, error: `Upload error: ${err.message || err}` }
           }));
-        } else {
-          const error = resData?.message || resData?.error || 'Upload failed';
-          setDetailsUploadProgress(prev => ({
-            ...prev,
-            [subField]: { uploading: false, error }
-          }));
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        setDetailsUploadProgress(prev => ({
-          ...prev,
-          [subField]: { uploading: false, error: `Upload error: ${err.message || err}` }
-        }));
-      });
+        });
     };
 
     return (
@@ -2752,7 +2792,9 @@ export default function TendersListView() {
                             <div className="md:col-span-2">
                               {renderSingleFileUploadDetails('contract_agreement', 'Contract Agreement', '.pdf')}
                             </div>
-                            {renderSingleFileUploadDetails('warranty', 'Warranty', '.pdf')}
+                            {renderSingleFileUploadDetails('warranty', 'Manufacturer Warranty', '.pdf')}
+                            {renderSingleFileUploadDetails('pbg', 'PBG (Performance Bank Guarantee)', '.pdf')}
+                            {renderSingleFileUploadDetails('insurance', 'Insurance', '.pdf')}
                             {renderSingleFileUploadDetails('acceptance_letter', 'Acceptance Letter', '.pdf')}
                           </div>
                         </div>
@@ -3001,43 +3043,67 @@ export default function TendersListView() {
                         ) : null}
 
                         {/* Legal & Execution Documents */}
-                        {(selectedTender.loi || selectedTender.po || selectedTender.contract_agreement || selectedTender.warranty || selectedTender.acceptance_letter) ? (
-                          <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
-                            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Legal & Execution Documents</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {selectedTender.loi && (
-                                <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
-                                  <span className="truncate pr-2">LOI</span>
-                                  <a href={selectedTender.loi} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
-                                </div>
-                              )}
-                              {selectedTender.po && (
-                                <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
-                                  <span className="truncate pr-2">PO</span>
-                                  <a href={selectedTender.po} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
-                                </div>
-                              )}
-                              {selectedTender.contract_agreement && (
-                                <div className="col-span-1 sm:col-span-2 flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
-                                  <span className="truncate pr-2">Contract Agreement</span>
-                                  <a href={selectedTender.contract_agreement} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
-                                </div>
-                              )}
-                              {selectedTender.warranty && (
-                                <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
-                                  <span className="truncate pr-2">Warranty</span>
-                                  <a href={selectedTender.warranty} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
-                                </div>
-                              )}
-                              {selectedTender.acceptance_letter && (
-                                <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
-                                  <span className="truncate pr-2">Acceptance Letter</span>
-                                  <a href={selectedTender.acceptance_letter} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
-                                </div>
-                              )}
+                        {(() => {
+                          const loiUrl = typeof selectedTender.loi === 'object' ? selectedTender.loi?.document_url : selectedTender.loi;
+                          const poUrl = typeof selectedTender.po === 'object' ? selectedTender.po?.document_url : selectedTender.po;
+                          const contractUrl = typeof selectedTender.contract_agreement === 'object' ? selectedTender.contract_agreement?.document_url : selectedTender.contract_agreement;
+                          const warrantyUrl = typeof selectedTender.warranty === 'object' ? selectedTender.warranty?.document_url : selectedTender.warranty;
+                          const pbgUrl = typeof selectedTender.pbg === 'object' ? selectedTender.pbg?.document_url : selectedTender.pbg;
+                          const insuranceUrl = typeof selectedTender.insurance === 'object' ? selectedTender.insurance?.document_url : selectedTender.insurance;
+                          const acceptanceUrl = typeof selectedTender.acceptance_letter === 'object' ? selectedTender.acceptance_letter?.document_url : selectedTender.acceptance_letter;
+
+                          if (!loiUrl && !poUrl && !contractUrl && !warrantyUrl && !pbgUrl && !insuranceUrl && !acceptanceUrl) return null;
+
+                          return (
+                            <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
+                              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Legal & Execution Documents</h4>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {loiUrl && (
+                                  <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                    <span className="truncate pr-2">LOI</span>
+                                    <a href={loiUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                  </div>
+                                )}
+                                {poUrl && (
+                                  <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                    <span className="truncate pr-2">PO</span>
+                                    <a href={poUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                  </div>
+                                )}
+                                {contractUrl && (
+                                  <div className="col-span-1 sm:col-span-2 flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                    <span className="truncate pr-2">Contract Agreement</span>
+                                    <a href={contractUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                  </div>
+                                )}
+                                {warrantyUrl && (
+                                  <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                    <span className="truncate pr-2">Manufacturer Warranty</span>
+                                    <a href={warrantyUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                  </div>
+                                )}
+                                {pbgUrl && (
+                                  <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                    <span className="truncate pr-2">PBG</span>
+                                    <a href={pbgUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                  </div>
+                                )}
+                                {insuranceUrl && (
+                                  <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                    <span className="truncate pr-2">Insurance</span>
+                                    <a href={insuranceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                  </div>
+                                )}
+                                {acceptanceUrl && (
+                                  <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
+                                    <span className="truncate pr-2">Acceptance Letter</span>
+                                    <a href={acceptanceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ) : null}
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
