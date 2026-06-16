@@ -1,5 +1,6 @@
 import React from 'react';
 import UserProfile from './UserProfile/UserProfile';
+import NotificationBell from './Notification/NotificationBell';
 
 /**
  * Reusable Header component for the application layout.
@@ -56,6 +57,7 @@ export const Header = ({
 
       {/* User Actions & Profile Section */}
       <div className="flex items-center gap-4">
+        <NotificationBell />
         <UserProfile
           name={userName}
           role={userRole}

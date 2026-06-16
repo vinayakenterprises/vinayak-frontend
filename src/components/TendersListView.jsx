@@ -1828,7 +1828,7 @@ export default function TendersListView() {
 
                 {/* Tender Title */}
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tender Title / Project Name <span className="text-rose-500">*</span></label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tender Title <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
                     name="tender_title"
