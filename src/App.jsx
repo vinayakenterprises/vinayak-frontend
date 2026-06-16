@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Header from './components/common/Header';
 import manishAvatar from './assets/manish_avatar.png';
-import veLogo from './assets/VE Logo.avif';
+import veLogo from './assets/mittalu-logo.png';
 import TenderDashboard from './components/TenderDashboard';
 import MDDashboard from './components/MDDashboard';
 import Login from './components/Login';
@@ -71,7 +71,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
       <Header
-        logoText="Vinayak Enterprises"
+        logoText="Mittalu Pvt Ltd"
         logoUrl={veLogo}
         userName={user.username}
         userRole={`${user.role} (${user.department})`}

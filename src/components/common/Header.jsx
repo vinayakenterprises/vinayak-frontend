@@ -17,7 +17,7 @@ import NotificationBell from './Notification/NotificationBell';
  * @param {string} [props.className=''] - Additional Tailwind classes for layout adjustments
  */
 export const Header = ({
-  logoText = 'Vinayak Enterprises',
+  logoText = 'Mittalu Pvt Ltd',
   logoLetter = 'V',
   logoBg = 'bg-sky-500',
   userName = 'Manish',

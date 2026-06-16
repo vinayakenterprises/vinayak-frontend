@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import veLogo from '../assets/VE Logo.avif';
+import veLogo from '../assets/mittalu-logo.png';
 import { API_BASE_URL } from '../config';
 
 export default function Login({ onLoginSuccess }) {
@@ -64,11 +64,11 @@ export default function Login({ onLoginSuccess }) {
         <div className="flex flex-col items-center text-center space-y-3">
           <img
             src={veLogo}
-            alt="Vinayak Enterprises Logo"
+            alt="Mittalu Pvt Ltd Logo"
             className="w-16 h-16 object-contain rounded-xl shadow-sm border border-slate-100"
           />
           <div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Vinayak Enterprises</h1>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Mittalu Pvt Ltd</h1>
             <p className="text-xs text-slate-500 mt-1">Tender Management Portal</p>
           </div>
         </div>
