@@ -22,7 +22,7 @@ const INDIAN_STATES = [
 
 const DOCUMENT_NAMES = ["Spec", "GCC", "IIB", "Notice", "BOQ"];
 
-const PRODUCT_NAMES = ["ab cable", "acsr", "aaa"];
+const PRODUCT_NAMES = ["AB Cable", "ACSR", "AAA"];
 
 const AB_CABLE_TYPES = [
   "ICX25+ICX25 SQMM BARE MESSENGER",
