@@ -2792,19 +2792,45 @@ export default function TendersListView() {
                           )}
                         </div>
 
-                        {/* LOI, PO, Contract Agreement, Warranty, Acceptance Letter */}
+                        {/* Legal & Execution Documents (PDF) */}
                         <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-4">
                           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Legal & Execution Documents (PDF)</h4>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {renderSingleFileUploadDetails('loi', 'LOI (Letter of Intent)', '.pdf')}
                             {renderSingleFileUploadDetails('po', 'PO (Purchase Order)', '.pdf')}
+                          </div>
+                        </div>
+
+                        {/* Immediate Processing Documents (PDF) */}
+                        <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-4">
+                          <div className="flex flex-col gap-2">
+                            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Immediate Processing Documents (PDF)</h4>
+                            <div className="p-3 bg-amber-50 text-amber-800 border border-amber-100 rounded-lg text-xs font-bold flex items-center gap-2 animate-fadeIn">
+                              <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              </svg>
+                              <span>Below documents should be processed immediately</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="md:col-span-2">
                               {renderSingleFileUploadDetails('contract_agreement', 'Contract Agreement', '.pdf')}
                             </div>
                             {renderSingleFileUploadDetails('warranty', 'Manufacturer Warranty', '.pdf')}
                             {renderSingleFileUploadDetails('pbg', 'PBG (Performance Bank Guarantee)', '.pdf')}
-                            {renderSingleFileUploadDetails('insurance', 'Insurance', '.pdf')}
+                            <div className="md:col-span-2">
+                              {renderSingleFileUploadDetails('insurance', 'Insurance', '.pdf')}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Acceptance & NPV Bond (PDF) */}
+                        <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-4">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Acceptance & Bond Documents (PDF)</h4>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {renderSingleFileUploadDetails('acceptance_letter', 'Acceptance Letter', '.pdf')}
                             {renderSingleFileUploadDetails('npv_bond', 'NPV Bond', '.pdf')}
                           </div>
@@ -3053,21 +3079,15 @@ export default function TendersListView() {
                           </div>
                         ) : null}
 
-                        {/* Legal & Execution Documents */}
+                        {/* Legal & Execution Documents (LOI & PO) */}
                         {(() => {
                           const loiUrl = typeof selectedTender.loi === 'object' ? selectedTender.loi?.document_url : selectedTender.loi;
                           const poUrl = typeof selectedTender.po === 'object' ? selectedTender.po?.document_url : selectedTender.po;
-                          const contractUrl = typeof selectedTender.contract_agreement === 'object' ? selectedTender.contract_agreement?.document_url : selectedTender.contract_agreement;
-                          const warrantyUrl = typeof selectedTender.warranty === 'object' ? selectedTender.warranty?.document_url : selectedTender.warranty;
-                          const pbgUrl = typeof selectedTender.pbg === 'object' ? selectedTender.pbg?.document_url : selectedTender.pbg;
-                          const insuranceUrl = typeof selectedTender.insurance === 'object' ? selectedTender.insurance?.document_url : selectedTender.insurance;
-                          const acceptanceUrl = typeof selectedTender.acceptance_letter === 'object' ? selectedTender.acceptance_letter?.document_url : selectedTender.acceptance_letter;
-                          const npvBondUrl = typeof selectedTender.npv_bond === 'object' ? selectedTender.npv_bond?.document_url : selectedTender.npv_bond;
 
-                          if (!loiUrl && !poUrl && !contractUrl && !warrantyUrl && !pbgUrl && !insuranceUrl && !acceptanceUrl && !npvBondUrl) return null;
+                          if (!loiUrl && !poUrl) return null;
 
                           return (
-                            <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
+                            <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3 animate-fadeIn">
                               <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Legal & Execution Documents</h4>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {loiUrl && (
@@ -3082,6 +3102,32 @@ export default function TendersListView() {
                                     <a href={poUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
                                   </div>
                                 )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Immediate Processing Documents */}
+                        {(() => {
+                          const contractUrl = typeof selectedTender.contract_agreement === 'object' ? selectedTender.contract_agreement?.document_url : selectedTender.contract_agreement;
+                          const warrantyUrl = typeof selectedTender.warranty === 'object' ? selectedTender.warranty?.document_url : selectedTender.warranty;
+                          const pbgUrl = typeof selectedTender.pbg === 'object' ? selectedTender.pbg?.document_url : selectedTender.pbg;
+                          const insuranceUrl = typeof selectedTender.insurance === 'object' ? selectedTender.insurance?.document_url : selectedTender.insurance;
+
+                          if (!contractUrl && !warrantyUrl && !pbgUrl && !insuranceUrl) return null;
+
+                          return (
+                            <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3 animate-fadeIn">
+                              <div className="flex flex-col gap-2">
+                                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Immediate Processing Documents</h4>
+                                <div className="p-3 bg-amber-50 text-amber-800 border border-amber-100 rounded-lg text-xs font-bold flex items-center gap-2">
+                                  <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                  </svg>
+                                  <span>Below documents should be processed immediately</span>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {contractUrl && (
                                   <div className="col-span-1 sm:col-span-2 flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
                                     <span className="truncate pr-2">Contract Agreement</span>
@@ -3106,6 +3152,22 @@ export default function TendersListView() {
                                     <a href={insuranceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-sky-500 hover:text-sky-600 font-bold uppercase shrink-0">View</a>
                                   </div>
                                 )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Acceptance & NPV Bond */}
+                        {(() => {
+                          const acceptanceUrl = typeof selectedTender.acceptance_letter === 'object' ? selectedTender.acceptance_letter?.document_url : selectedTender.acceptance_letter;
+                          const npvBondUrl = typeof selectedTender.npv_bond === 'object' ? selectedTender.npv_bond?.document_url : selectedTender.npv_bond;
+
+                          if (!acceptanceUrl && !npvBondUrl) return null;
+
+                          return (
+                            <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3 animate-fadeIn">
+                              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Acceptance & Bond Documents</h4>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {acceptanceUrl && (
                                   <div className="flex items-center justify-between bg-white border border-slate-150 rounded-lg p-2.5 text-xs text-slate-700 font-medium">
                                     <span className="truncate pr-2">Acceptance Letter</span>
