@@ -442,7 +442,7 @@ const AccountsTeamDashboard = () => {
                                     <th className="py-3.5 px-6">Tender ID</th>
                                     <th className="py-3.5 px-4">Title &amp; Reference</th>
                                     <th className="py-3.5 px-4">Organization</th>
-                                    <th className="py-3.5 px-4">Cable Length</th>
+                                    <th className="py-3.5 px-4">Total Order Length</th>
                                     <th className="py-3.5 px-4">State</th>
                                     <th className="py-3.5 px-4">Closing Date</th>
                                     <th className="py-3.5 px-4">Value</th>
@@ -561,7 +561,7 @@ const AccountsTeamDashboard = () => {
                                     </div>
 
                                     <div>
-                                        <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Cable Length</span>
+                                        <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Total Order Length</span>
                                         <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{selectedTender.cable_length_km} KM</span>
                                     </div>
 

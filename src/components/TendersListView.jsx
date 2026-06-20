@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import { formatToIST } from '../utils/helper-functions';
 
 const TABS = [
   { id: 'Active Tenders', label: 'Active Tenders', statusValue: 'Active' },
@@ -202,6 +203,8 @@ export default function TendersListView() {
         safeFetch('get-completed-tenders-for-tender-agent'),
         safeFetch('get-approved-tenders-for-tender-agent')
       ]);
+
+      console.log("active tender lsit -> ", activeList);
 
       const mappedActive = activeList.map(t => ({ ...t, status: 'Active' }));
       const mappedPending = pendingList.map(t => ({ ...t, status: 'Pending MD Approval' }));
@@ -1567,19 +1570,20 @@ export default function TendersListView() {
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Reference Number</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Project Name</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Organization</th>
-                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Cable Length</th>
+                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Total Order Length</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">State</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Publish Date</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Closing Date</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tender Value</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tender Fee / EMD</th>
+                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Added At</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {isLoadingTenders ? (
                   <tr>
-                    <td colSpan="11" className="py-12 px-6 text-center">
+                    <td colSpan="12" className="py-12 px-6 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <svg className="animate-spin h-7 w-7 text-sky-500" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -1591,7 +1595,7 @@ export default function TendersListView() {
                   </tr>
                 ) : fetchError ? (
                   <tr>
-                    <td colSpan="11" className="py-12 px-6 text-center">
+                    <td colSpan="12" className="py-12 px-6 text-center">
                       <div className="flex flex-col items-center justify-center space-y-2 text-rose-600">
                         <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1609,7 +1613,7 @@ export default function TendersListView() {
                   </tr>
                 ) : filteredTenders.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="py-12 px-6 text-center">
+                    <td colSpan="12" className="py-12 px-6 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="p-3 bg-slate-50 rounded-full text-slate-400">
                           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -1652,6 +1656,7 @@ export default function TendersListView() {
                         <td className="py-4 px-4 text-sm text-slate-500 whitespace-nowrap">{formatDate(tender.closing_date)}</td>
                         <td className="py-4 px-4 text-sm font-semibold text-slate-700 whitespace-nowrap">₹{Number(tender.tender_value_cr || 0).toFixed(2)} Cr</td>
                         <td className="py-4 px-4 text-sm text-slate-600 whitespace-nowrap">₹{Number(tender.tender_fee_inr || 0).toFixed(2)} / ₹{Number(tender.emd_inr || 0).toFixed(2)}</td>
+                        <td className="py-4 px-4 text-sm text-slate-500 whitespace-nowrap">{formatToIST(tender.created_at)}</td>
                         <td className="py-4 px-6 text-sm text-right relative">
                           <div className="flex items-center justify-end gap-1">
                             {/* View button */}
@@ -1943,9 +1948,9 @@ export default function TendersListView() {
                   )}
                 </div>
 
-                {/* Cable Length KM */}
+                {/* Total Order Length KM */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Cable Length (KM) <span className="text-rose-500">*</span></label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Total Order Length (KM) <span className="text-rose-500">*</span></label>
                   <input
                     type="number"
                     name="cable_length_km"
@@ -2291,7 +2296,7 @@ export default function TendersListView() {
                   </div>
 
                   <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Cable Length</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Total Order Length</span>
                     <span className="text-xs font-semibold text-slate-700">{selectedTender.cable_length_km} KM</span>
                   </div>
 
