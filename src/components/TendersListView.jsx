@@ -1567,7 +1567,7 @@ export default function TendersListView() {
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Reference Number</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Project Name</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Organization</th>
-                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Cable Length</th>
+                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Total Order Length</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">State</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Publish Date</th>
                   <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Closing Date</th>
@@ -1943,9 +1943,9 @@ export default function TendersListView() {
                   )}
                 </div>
 
-                {/* Cable Length KM */}
+                {/* Total Order Length KM */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Cable Length (KM) <span className="text-rose-500">*</span></label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Total Order Length (KM) <span className="text-rose-500">*</span></label>
                   <input
                     type="number"
                     name="cable_length_km"
@@ -2291,7 +2291,7 @@ export default function TendersListView() {
                   </div>
 
                   <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Cable Length</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Total Order Length</span>
                     <span className="text-xs font-semibold text-slate-700">{selectedTender.cable_length_km} KM</span>
                   </div>
 
