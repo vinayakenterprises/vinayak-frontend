@@ -374,9 +374,9 @@ export default function TendersListView() {
     setProductNameSel(resolvedNameSel);
 
     let resolvedTypeSel = '';
-    if (resolvedNameSel === 'ab cable') {
+    if (resolvedNameSel === 'AB Cable') {
       resolvedTypeSel = AB_CABLE_TYPES.includes(tender.product_type) ? tender.product_type : (tender.product_type ? 'Other' : '');
-    } else if (resolvedNameSel === 'acsr' || resolvedNameSel === 'aaa') {
+    } else if (resolvedNameSel === 'ACSR' || resolvedNameSel === 'AAA') {
       resolvedTypeSel = ACSR_AAA_TYPES.includes(tender.product_type) ? tender.product_type : (tender.product_type ? 'Other' : '');
     } else if (resolvedNameSel === 'other') {
       resolvedTypeSel = 'Other';
@@ -1912,7 +1912,7 @@ export default function TendersListView() {
                         className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none bg-white focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow text-slate-800"
                       >
                         <option value="" disabled>Select Product Type</option>
-                        {(productNameSel === 'ab cable' ? AB_CABLE_TYPES : ACSR_AAA_TYPES).map(type => (
+                        {(productNameSel === 'AB Cable' ? AB_CABLE_TYPES : ACSR_AAA_TYPES).map(type => (
                           <option key={type} value={type}>{type}</option>
                         ))}
                         <option value="Other">Other</option>

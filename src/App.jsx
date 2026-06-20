@@ -6,6 +6,7 @@ import TenderDashboard from './components/TenderDashboard';
 import MDDashboard from './components/MDDashboard';
 import Login from './components/Login';
 import AccountsTeamDashboard from './components/AccountsTeamDashboard';
+import UserProfileModal from './components/UserProfileModal';
 
 function App() {
   const [user, setUser] = useState(() => {
@@ -17,6 +18,7 @@ function App() {
     }
   });
   const [, setToken] = useState(() => localStorage.getItem('token') || '');
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const handleLoginSuccess = (loggedInUser, userToken) => {
     setUser(loggedInUser);
@@ -32,15 +34,15 @@ function App() {
 
   // User profile actions
   const userDropdownItems = [
-    // {
-    //   label: 'My Profile',
-    //   onClick: () => alert(`Profile of ${user?.username} (${user?.email_id})`),
-    //   icon: (
-    //     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    //       <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-    //     </svg>
-    //   ),
-    // },
+    {
+      label: 'My Profile',
+      onClick: () => setIsProfileOpen(true),
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+    },
     // {
     //   label: 'Settings',
     //   onClick: () => alert('Settings Clicked'),
@@ -105,6 +107,9 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* User Profile Modal */}
+      <UserProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </div>
   );
 }
