@@ -108,6 +108,7 @@ const isCounterOfferEqual = (origCO, propCO) => {
   const origApproveMDAt = origCO ? (origCO.counter_offer_approve_by_md_at || null) : null;
   const origAcceptPdf = origCO ? (origCO.acceptance_pdf || '') : '';
   const origNonAcceptPdf = origCO ? (origCO.non_acceptance_pdf || '') : '';
+  const origDeadline = origCO ? (origCO.counter_offer_deadline || '') : '';
 
   let origDocs = [];
   if (origCO) {
@@ -128,6 +129,7 @@ const isCounterOfferEqual = (origCO, propCO) => {
   const propApproveMDAt = propCO?.counter_offer_approve_by_md_at || null;
   const propAcceptPdf = propCO?.acceptance_pdf || '';
   const propNonAcceptPdf = propCO?.non_acceptance_pdf || '';
+  const propDeadline = propCO?.counter_offer_deadline || '';
   const propDocs = propEnabled
     ? (propCO?.documents || []).map(d => ({
       url: d.url || '',
@@ -142,6 +144,7 @@ const isCounterOfferEqual = (origCO, propCO) => {
   if (origApproveMDAt !== propApproveMDAt) return false;
   if (origAcceptPdf !== propAcceptPdf) return false;
   if (origNonAcceptPdf !== propNonAcceptPdf) return false;
+  if (origDeadline !== propDeadline) return false;
 
   if (origDocs.length !== propDocs.length) return false;
   for (let i = 0; i < origDocs.length; i++) {
@@ -212,7 +215,8 @@ export default function TendersListView() {
       counter_offer_approve_by_md: false,
       counter_offer_approve_by_md_at: null,
       acceptance_pdf: '',
-      non_acceptance_pdf: ''
+      non_acceptance_pdf: '',
+      counter_offer_deadline: ''
     },
     loi: '',
     loi_fileName: '',
@@ -557,7 +561,8 @@ export default function TendersListView() {
             counter_offer_approve_by_md: false,
             counter_offer_approve_by_md_at: null,
             acceptance_pdf: '',
-            non_acceptance_pdf: ''
+            non_acceptance_pdf: '',
+            counter_offer_deadline: ''
           };
         }
         const enabled = tender.counter_offer.counter_offer !== undefined
@@ -570,6 +575,7 @@ export default function TendersListView() {
         const counter_offer_approve_by_md_at = tender.counter_offer.counter_offer_approve_by_md_at || null;
         const acceptance_pdf = tender.counter_offer.acceptance_pdf || '';
         const non_acceptance_pdf = tender.counter_offer.non_acceptance_pdf || '';
+        const counter_offer_deadline = tender.counter_offer.counter_offer_deadline || '';
 
         let documents = [];
         if (Array.isArray(tender.counter_offer.documents)) {
@@ -598,7 +604,8 @@ export default function TendersListView() {
           counter_offer_approve_by_md,
           counter_offer_approve_by_md_at,
           acceptance_pdf,
-          non_acceptance_pdf
+          non_acceptance_pdf,
+          counter_offer_deadline
         };
       })(),
       loi: (tender.loi && typeof tender.loi === 'object') ? (tender.loi.document_url || '') : (typeof tender.loi === 'string' ? tender.loi : ''),
@@ -858,6 +865,10 @@ export default function TendersListView() {
   };
 
   const handleSendCounterOfferForApproval = async () => {
+    if (!detailsForm.counter_offer.counter_offer_deadline) {
+      alert('Please select a deadline before sending the counter offer for approval.');
+      return;
+    }
     if (detailsForm.counter_offer.documents.some(d => d.uploading)) {
       alert('Please wait for files to finish uploading before sending for approval.');
       return;
@@ -1093,7 +1104,8 @@ export default function TendersListView() {
         }))
         : [],
       acceptance_pdf: detailsForm.counter_offer.acceptance_pdf || '',
-      non_acceptance_pdf: detailsForm.counter_offer.non_acceptance_pdf || ''
+      non_acceptance_pdf: detailsForm.counter_offer.non_acceptance_pdf || '',
+      counter_offer_deadline: detailsForm.counter_offer.counter_offer_deadline || ''
     };
     if (!isCounterOfferEqual(selectedTender.counter_offer, propCOForCompare)) {
       payload.counter_offer = {
@@ -1104,7 +1116,8 @@ export default function TendersListView() {
         ...(propCOForCompare.counter_offer_approve_by_md_at ? { counter_offer_approve_by_md_at: propCOForCompare.counter_offer_approve_by_md_at } : { counter_offer_approve_by_md_at: null }),
         documents: propCOForCompare.documents,
         acceptance_pdf: propCOForCompare.acceptance_pdf || null,
-        non_acceptance_pdf: propCOForCompare.non_acceptance_pdf || null
+        non_acceptance_pdf: propCOForCompare.non_acceptance_pdf || null,
+        counter_offer_deadline: propCOForCompare.counter_offer_deadline || null
       };
     }
 
@@ -2900,6 +2913,29 @@ export default function TendersListView() {
 
                           {detailsForm.counter_offer.enabled && (
                             <div className="space-y-3 border-t border-slate-200/50 pt-3">
+                              {/* Deadline picker */}
+                              <div className="mb-4 animate-fadeIn">
+                                <label className="block text-[10px] font-bold text-slate-550 uppercase mb-1">
+                                  Deadline <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                  type="datetime-local"
+                                  value={detailsForm.counter_offer.counter_offer_deadline || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setDetailsForm(prev => ({
+                                      ...prev,
+                                      counter_offer: {
+                                        ...prev.counter_offer,
+                                        counter_offer_deadline: val
+                                      }
+                                    }));
+                                  }}
+                                  disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval || detailsForm.counter_offer.counter_offer_approve_by_md}
+                                  className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded text-xs focus:outline-none focus:border-sky-500 text-slate-800 disabled:bg-slate-50 disabled:text-slate-400"
+                                />
+                              </div>
+
                               <div className="space-y-3">
                                 {detailsForm.counter_offer.documents.map((doc, idx) => (
                                   <div key={idx} className="flex gap-3 items-end bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
@@ -3053,7 +3089,7 @@ export default function TendersListView() {
                                   <button
                                     type="button"
                                     onClick={handleSendCounterOfferForApproval}
-                                    disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval || detailsForm.counter_offer.counter_offer_approve_by_md || detailsForm.counter_offer.counter_offer_approve_by_md_at != null || detailsForm.counter_offer.documents.length === 0 || detailsForm.counter_offer.documents.some(d => !d.url || d.uploading)}
+                                    disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval || detailsForm.counter_offer.counter_offer_approve_by_md || detailsForm.counter_offer.counter_offer_approve_by_md_at != null || detailsForm.counter_offer.documents.length === 0 || detailsForm.counter_offer.documents.some(d => !d.url || d.uploading) || !detailsForm.counter_offer.counter_offer_deadline}
                                     className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
                                   >
                                     {detailsForm.counter_offer.sent_for_approval ? 'Sent For Approval' : 'Send For Approval'}
@@ -3250,13 +3286,21 @@ export default function TendersListView() {
                               <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full">Enabled</span>
                             </div>
 
-                            {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md_at) && (
+                            {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md_at || selectedTender.counter_offer?.counter_offer_deadline) && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-3 animate-fadeIn">
                                 {selectedTender.counter_offer?.sent_for_approval && (
                                   <div>
                                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Sent for Approval At</span>
                                     <span className="text-xs font-semibold text-slate-700">
                                       {new Date(selectedTender.counter_offer.sent_for_approval_at).toLocaleString()}
+                                    </span>
+                                  </div>
+                                )}
+                                {selectedTender.counter_offer?.counter_offer_deadline && (
+                                  <div>
+                                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Deadline</span>
+                                    <span className="text-xs font-semibold text-slate-700">
+                                      {new Date(selectedTender.counter_offer.counter_offer_deadline).toLocaleString()}
                                     </span>
                                   </div>
                                 )}
