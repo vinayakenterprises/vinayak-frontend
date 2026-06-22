@@ -1110,22 +1110,16 @@ export default function TendersListView() {
 
     const token = localStorage.getItem('token') || '';
 
+    // Check if anything has changed
+    const hasChanges = Object.keys(payload).length > 1;
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/update-tender-details`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
+      let completedAt = null;
 
-      const resData = await response.json().catch(() => null);
-
-      if (response.ok && resData?.status === 'success') {
-        let completedAt = null;
-
+      if (!hasChanges) {
+        // No changes to save
         if (isMarkComplete) {
+          // If marking as complete, we proceed directly to complete the tender
           const completeResponse = await fetch(`${API_BASE_URL}/api/v1/tenders/mark-as-complete-tender-after-approved-by-md/${selectedTender.id}`, {
             method: 'PUT',
             headers: {
@@ -1144,33 +1138,15 @@ export default function TendersListView() {
             return;
           }
         } else {
+          // No changes and not marking complete, just show success directly
           setDetailsSaveSuccess('Tender details updated successfully!');
         }
 
-        // Refresh local selectedTender so any display in the modal gets synced
+        // Update local state (even though no details changed, completed status may have changed)
         setSelectedTender(prev => {
           if (!prev) return null;
           return {
             ...prev,
-            ...(payload.hasOwnProperty('shortfall') ? { shortfall: payload.shortfall } : {}),
-            ...(payload.hasOwnProperty('docs_resubmitted') ? { docs_resubmitted: payload.docs_resubmitted } : {}),
-            ...(payload.hasOwnProperty('rank_file') ? { rank_file: payload.rank_file } : {}),
-            ...(payload.hasOwnProperty('fee_document') ? { fee_document: payload.fee_document } : {}),
-            ...(payload.hasOwnProperty('technical_document') ? { technical_document: payload.technical_document } : {}),
-            ...(payload.hasOwnProperty('boq_filled') ? { boq_filled: payload.boq_filled } : {}),
-            ...(payload.hasOwnProperty('courier') ? { courier: payload.courier } : {}),
-            ...(payload.hasOwnProperty('submission_actual') ? { submission_actual: payload.submission_actual } : {}),
-            ...(payload.hasOwnProperty('submit_to_govt_portal_slip') ? { submit_to_govt_portal_slip: payload.submit_to_govt_portal_slip } : {}),
-            ...(payload.hasOwnProperty('a9slip') ? { a9slip: payload.a9slip } : {}),
-            ...(payload.hasOwnProperty('counter_offer') ? { counter_offer: payload.counter_offer } : {}),
-            ...(payload.hasOwnProperty('loi') ? { loi: payload.loi } : {}),
-            ...(payload.hasOwnProperty('po') ? { po: payload.po } : {}),
-            ...(payload.hasOwnProperty('contract_agreement') ? { contract_agreement: payload.contract_agreement } : {}),
-            ...(payload.hasOwnProperty('warranty') ? { warranty: payload.warranty } : {}),
-            ...(payload.hasOwnProperty('pbg') ? { pbg: payload.pbg } : {}),
-            ...(payload.hasOwnProperty('insurance') ? { insurance: payload.insurance } : {}),
-            ...(payload.hasOwnProperty('acceptance_letter') ? { acceptance_letter: payload.acceptance_letter } : {}),
-            ...(payload.hasOwnProperty('npv_bond') ? { npv_bond: payload.npv_bond } : {}),
             tender_completed_at: isMarkComplete ? completedAt : prev.tender_completed_at
           };
         });
@@ -1181,8 +1157,80 @@ export default function TendersListView() {
         setTimeout(() => {
           setDetailsSaveSuccess('');
         }, 3000);
+
       } else {
-        setDetailsSaveError(resData?.message || resData?.error || 'Failed to update tender details.');
+        // We have changes, so make the update call
+        const response = await fetch(`${API_BASE_URL}/api/v1/tenders/update-tender-details`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const resData = await response.json().catch(() => null);
+
+        if (response.ok && resData?.status === 'success') {
+          if (isMarkComplete) {
+            const completeResponse = await fetch(`${API_BASE_URL}/api/v1/tenders/mark-as-complete-tender-after-approved-by-md/${selectedTender.id}`, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            const completeData = await completeResponse.json().catch(() => null);
+
+            if (completeResponse.ok && completeData?.status === 'success') {
+              completedAt = completeData.data?.tender_completed_at || new Date().toISOString();
+              setDetailsSaveSuccess('Tender details updated and marked as complete successfully!');
+            } else {
+              setDetailsSaveError(completeData?.message || completeData?.error || 'Failed to mark tender as complete.');
+              setIsSavingDetails(false);
+              return;
+            }
+          } else {
+            setDetailsSaveSuccess('Tender details updated successfully!');
+          }
+
+          // Refresh local selectedTender so any display in the modal gets synced
+          setSelectedTender(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              ...(payload.hasOwnProperty('shortfall') ? { shortfall: payload.shortfall } : {}),
+              ...(payload.hasOwnProperty('docs_resubmitted') ? { docs_resubmitted: payload.docs_resubmitted } : {}),
+              ...(payload.hasOwnProperty('rank_file') ? { rank_file: payload.rank_file } : {}),
+              ...(payload.hasOwnProperty('fee_document') ? { fee_document: payload.fee_document } : {}),
+              ...(payload.hasOwnProperty('technical_document') ? { technical_document: payload.technical_document } : {}),
+              ...(payload.hasOwnProperty('boq_filled') ? { boq_filled: payload.boq_filled } : {}),
+              ...(payload.hasOwnProperty('courier') ? { courier: payload.courier } : {}),
+              ...(payload.hasOwnProperty('submission_actual') ? { submission_actual: payload.submission_actual } : {}),
+              ...(payload.hasOwnProperty('submit_to_govt_portal_slip') ? { submit_to_govt_portal_slip: payload.submit_to_govt_portal_slip } : {}),
+              ...(payload.hasOwnProperty('a9slip') ? { a9slip: payload.a9slip } : {}),
+              ...(payload.hasOwnProperty('counter_offer') ? { counter_offer: payload.counter_offer } : {}),
+              ...(payload.hasOwnProperty('loi') ? { loi: payload.loi } : {}),
+              ...(payload.hasOwnProperty('po') ? { po: payload.po } : {}),
+              ...(payload.hasOwnProperty('contract_agreement') ? { contract_agreement: payload.contract_agreement } : {}),
+              ...(payload.hasOwnProperty('warranty') ? { warranty: payload.warranty } : {}),
+              ...(payload.hasOwnProperty('pbg') ? { pbg: payload.pbg } : {}),
+              ...(payload.hasOwnProperty('insurance') ? { insurance: payload.insurance } : {}),
+              ...(payload.hasOwnProperty('acceptance_letter') ? { acceptance_letter: payload.acceptance_letter } : {}),
+              ...(payload.hasOwnProperty('npv_bond') ? { npv_bond: payload.npv_bond } : {}),
+              tender_completed_at: isMarkComplete ? completedAt : prev.tender_completed_at
+            };
+          });
+
+          // Reload the main dashboard list
+          await loadTenders();
+
+          setTimeout(() => {
+            setDetailsSaveSuccess('');
+          }, 3000);
+        } else {
+          setDetailsSaveError(resData?.message || resData?.error || 'Failed to update tender details.');
+        }
       }
     } catch (err) {
       console.error(err);
