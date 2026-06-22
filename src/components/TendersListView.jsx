@@ -63,6 +63,96 @@ const formatDate = (dateString) => {
   }
 };
 
+const getOriginalDocUrl = (tender, fieldName) => {
+  if (!tender) return '';
+  const val = tender[fieldName];
+  if (!val) return '';
+  if (typeof val === 'object') {
+    return val.document_url || val.url || '';
+  }
+  if (typeof val === 'string') {
+    return val;
+  }
+  return '';
+};
+
+const isDocsResubmittedEqual = (arrA, arrB) => {
+  const cleanA = (arrA || []).map(d => ({
+    document_name: d.document_name || d.name || d.fileName || '',
+    document_url: d.document_url || d.url || '',
+    reason: d.reason || ''
+  }));
+  const cleanB = (arrB || []).map(d => ({
+    document_name: d.document_name || d.name || d.fileName || '',
+    document_url: d.document_url || d.url || '',
+    reason: d.reason || ''
+  }));
+  if (cleanA.length !== cleanB.length) return false;
+  for (let i = 0; i < cleanA.length; i++) {
+    if (cleanA[i].document_name !== cleanB[i].document_name ||
+        cleanA[i].document_url !== cleanB[i].document_url ||
+        cleanA[i].reason !== cleanB[i].reason) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const isCounterOfferEqual = (origCO, propCO) => {
+  if (!origCO && !propCO) return true;
+  
+  const origEnabled = origCO ? (origCO.counter_offer !== undefined ? !!origCO.counter_offer : !!origCO.enabled) : false;
+  const origSent = origCO ? !!origCO.sent_for_approval : false;
+  const origSentAt = origCO ? (origCO.sent_for_approval_at || '') : '';
+  const origApproveMD = origCO ? !!origCO.counter_offer_approve_by_md : false;
+  const origApproveMDAt = origCO ? (origCO.counter_offer_approve_by_md_at || null) : null;
+  const origAcceptPdf = origCO ? (origCO.acceptance_pdf || '') : '';
+  const origNonAcceptPdf = origCO ? (origCO.non_acceptance_pdf || '') : '';
+
+  let origDocs = [];
+  if (origCO) {
+    if (Array.isArray(origCO.documents)) {
+      origDocs = origCO.documents.map(d => ({
+        url: d.url || d.document_url || '',
+        remark: d.remark || ''
+      }));
+    } else if (origCO.doc_url) {
+      origDocs = [{ url: origCO.doc_url, remark: '' }];
+    }
+  }
+
+  const propEnabled = !!propCO?.enabled;
+  const propSent = !!propCO?.sent_for_approval;
+  const propSentAt = propCO?.sent_for_approval_at || '';
+  const propApproveMD = !!propCO?.counter_offer_approve_by_md;
+  const propApproveMDAt = propCO?.counter_offer_approve_by_md_at || null;
+  const propAcceptPdf = propCO?.acceptance_pdf || '';
+  const propNonAcceptPdf = propCO?.non_acceptance_pdf || '';
+  const propDocs = propEnabled
+    ? (propCO?.documents || []).map(d => ({
+        url: d.url || '',
+        remark: d.remark || ''
+      }))
+    : [];
+
+  if (origEnabled !== propEnabled) return false;
+  if (origSent !== propSent) return false;
+  if (origSentAt !== propSentAt) return false;
+  if (origApproveMD !== propApproveMD) return false;
+  if (origApproveMDAt !== propApproveMDAt) return false;
+  if (origAcceptPdf !== propAcceptPdf) return false;
+  if (origNonAcceptPdf !== propNonAcceptPdf) return false;
+
+  if (origDocs.length !== propDocs.length) return false;
+  for (let i = 0; i < origDocs.length; i++) {
+    if (origDocs[i].url !== propDocs[i].url || origDocs[i].remark !== propDocs[i].remark) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 export default function TendersListView() {
   const [tenders, setTenders] = useState([]);
   const [activeTab, setActiveTab] = useState('Active Tenders');
@@ -903,89 +993,120 @@ export default function TendersListView() {
     }
 
     const currentTimestamp = new Date();
+    
+    // Construct dynamic payload containing only changes
     const payload = {
-      id: selectedTender.id,
-      shortfall: detailsForm.shortfall,
-      docs_resubmitted: detailsForm.shortfall
-        ? detailsForm.docs_resubmitted.map(d => ({
-          document_name: d.document_name || d.fileName || '',
-          document_url: d.document_url || d.url || '',
-          reason: d.reason || '',
-          ...(d.added_at ? { added_at: d.added_at } : {})
+      id: selectedTender.id
+    };
+
+    // 1. shortfall check
+    const origShortfall = !!selectedTender.shortfall;
+    const propShortfall = !!detailsForm.shortfall;
+    if (origShortfall !== propShortfall) {
+      payload.shortfall = propShortfall;
+    }
+
+    // 2. docs_resubmitted check
+    const propDocsResubmitted = detailsForm.shortfall
+      ? detailsForm.docs_resubmitted.map(d => ({
+        document_name: d.document_name || d.fileName || '',
+        document_url: d.document_url || d.url || '',
+        reason: d.reason || '',
+        ...(d.added_at ? { added_at: d.added_at } : {})
+      }))
+      : [];
+    if (!isDocsResubmittedEqual(selectedTender.docs_resubmitted, propDocsResubmitted)) {
+      payload.docs_resubmitted = propDocsResubmitted;
+    }
+
+    // 3. Document fields checks
+    const standardDocFields = [
+      'fee_document', 'technical_document', 'boq_filled', 'loi', 'po',
+      'contract_agreement', 'warranty', 'pbg', 'insurance', 'acceptance_letter', 'npv_bond'
+    ];
+    for (const field of standardDocFields) {
+      const origUrl = getOriginalDocUrl(selectedTender, field);
+      const propUrl = detailsForm[field] || '';
+      if (origUrl !== propUrl) {
+        payload[field] = propUrl
+          ? {
+              document_url: propUrl,
+              added_at: detailsForm[`${field}_added_at`] || new Date().toISOString()
+            }
+          : null;
+      }
+    }
+
+    const customDocFields = ['rank_file', 'submit_to_govt_portal_slip', 'a9slip'];
+    for (const field of customDocFields) {
+      const origUrl = getOriginalDocUrl(selectedTender, field);
+      const propUrl = detailsForm[field] || '';
+      if (origUrl !== propUrl) {
+        payload[field] = propUrl
+          ? {
+              document_url: propUrl,
+              ...(detailsForm[`${field}_added_at`] ? { added_at: detailsForm[`${field}_added_at`] } : {})
+            }
+          : null;
+      }
+    }
+
+    // 4. courier check
+    const origCourierStatus = !!selectedTender.courier?.courier_status;
+    const origCourierAddedAt = selectedTender.courier?.added_at || '';
+    const propCourierStatus = !!detailsForm.courier?.courier_status;
+    const propCourierAddedAt = propCourierStatus ? (detailsForm.courier?.added_at || '') : '';
+    if (origCourierStatus !== propCourierStatus || origCourierAddedAt !== propCourierAddedAt) {
+      payload.courier = {
+        courier_status: propCourierStatus,
+        added_at: propCourierStatus
+          ? (detailsForm.courier?.added_at || new Date().toISOString())
+          : null
+      };
+    }
+
+    // 5. submission_actual check
+    const origSubmissionStatus = !!selectedTender.submission_actual?.submission_actual_status;
+    const origSubmissionAddedAt = selectedTender.submission_actual?.added_at || '';
+    const propSubmissionStatus = !!detailsForm.submission_actual?.submission_actual_status;
+    const propSubmissionAddedAt = propSubmissionStatus ? (detailsForm.submission_actual?.added_at || '') : '';
+    if (origSubmissionStatus !== propSubmissionStatus || origSubmissionAddedAt !== propSubmissionAddedAt) {
+      payload.submission_actual = {
+        submission_actual_status: propSubmissionStatus,
+        added_at: propSubmissionStatus
+          ? (detailsForm.submission_actual?.added_at || new Date().toISOString())
+          : null
+      };
+    }
+
+    // 6. counter_offer check
+    const propCOForCompare = {
+      enabled: !!counterOfferOverride ? !!counterOfferOverride.enabled : !!detailsForm.counter_offer.enabled,
+      sent_for_approval: !!counterOfferOverride ? !!counterOfferOverride.sent_for_approval : !!detailsForm.counter_offer.sent_for_approval,
+      sent_for_approval_at: (counterOfferOverride ? counterOfferOverride.sent_for_approval_at : detailsForm.counter_offer.sent_for_approval_at) || '',
+      counter_offer_approve_by_md: !!counterOfferOverride ? !!counterOfferOverride.counter_offer_approve_by_md : !!detailsForm.counter_offer.counter_offer_approve_by_md,
+      counter_offer_approve_by_md_at: (counterOfferOverride ? counterOfferOverride.counter_offer_approve_by_md_at : detailsForm.counter_offer.counter_offer_approve_by_md_at) || null,
+      documents: (counterOfferOverride ? counterOfferOverride.enabled : detailsForm.counter_offer.enabled)
+        ? (counterOfferOverride ? counterOfferOverride.documents : detailsForm.counter_offer.documents).map(d => ({
+          url: d.url || '',
+          remark: d.remark || ''
         }))
         : [],
-      rank_file: detailsForm.rank_file
-        ? {
-          document_url: detailsForm.rank_file,
-          ...(detailsForm.rank_file_added_at ? { added_at: detailsForm.rank_file_added_at } : {})
-        }
-        : null,
-      fee_document: detailsForm.fee_document
-        ? {
-          document_url: detailsForm.fee_document,
-          added_at: detailsForm.fee_document_added_at || new Date().toISOString()
-        }
-        : null,
-      technical_document: detailsForm.technical_document
-        ? {
-          document_url: detailsForm.technical_document,
-          added_at: detailsForm.technical_document_added_at || new Date().toISOString()
-        }
-        : null,
-      boq_filled: detailsForm.boq_filled
-        ? {
-          document_url: detailsForm.boq_filled,
-          added_at: detailsForm.boq_filled_added_at || new Date().toISOString()
-        }
-        : null,
-      courier: {
-        courier_status: !!detailsForm.courier?.courier_status,
-        added_at: detailsForm.courier?.courier_status
-          ? (detailsForm.courier.added_at || new Date().toISOString())
-          : null
-      },
-      submission_actual: {
-        submission_actual_status: !!detailsForm.submission_actual?.submission_actual_status,
-        added_at: detailsForm.submission_actual?.submission_actual_status
-          ? (detailsForm.submission_actual.added_at || new Date().toISOString())
-          : null
-      },
-      submit_to_govt_portal_slip: detailsForm.submit_to_govt_portal_slip
-        ? {
-          document_url: detailsForm.submit_to_govt_portal_slip,
-          ...(detailsForm.submit_to_govt_portal_slip_added_at ? { added_at: detailsForm.submit_to_govt_portal_slip_added_at } : {})
-        }
-        : null,
-      a9slip: detailsForm.a9slip
-        ? {
-          document_url: detailsForm.a9slip,
-          ...(detailsForm.a9slip_added_at ? { added_at: detailsForm.a9slip_added_at } : {})
-        }
-        : null,
-      counter_offer: {
-        counter_offer: !!counterOfferOverride ? !!counterOfferOverride.enabled : !!detailsForm.counter_offer.enabled,
-        sent_for_approval: !!counterOfferOverride ? !!counterOfferOverride.sent_for_approval : !!detailsForm.counter_offer.sent_for_approval,
-        ...((counterOfferOverride ? counterOfferOverride.sent_for_approval_at : detailsForm.counter_offer.sent_for_approval_at) ? { sent_for_approval_at: (counterOfferOverride ? counterOfferOverride.sent_for_approval_at : detailsForm.counter_offer.sent_for_approval_at) } : {}),
-        counter_offer_approve_by_md: !!counterOfferOverride ? !!counterOfferOverride.counter_offer_approve_by_md : !!detailsForm.counter_offer.counter_offer_approve_by_md,
-        ...((counterOfferOverride ? counterOfferOverride.counter_offer_approve_by_md_at : detailsForm.counter_offer.counter_offer_approve_by_md_at) ? { counter_offer_approve_by_md_at: (counterOfferOverride ? counterOfferOverride.counter_offer_approve_by_md_at : detailsForm.counter_offer.counter_offer_approve_by_md_at) } : { counter_offer_approve_by_md_at: null }),
-        documents: (counterOfferOverride ? counterOfferOverride.enabled : detailsForm.counter_offer.enabled)
-          ? (counterOfferOverride ? counterOfferOverride.documents : detailsForm.counter_offer.documents).map(d => ({
-            url: d.url || '',
-            remark: d.remark || ''
-          }))
-          : [],
-        acceptance_pdf: detailsForm.counter_offer.acceptance_pdf || null,
-        non_acceptance_pdf: detailsForm.counter_offer.non_acceptance_pdf || null
-      },
-      loi: detailsForm.loi ? { document_url: detailsForm.loi, added_at: detailsForm.loi_added_at || new Date().toISOString() } : null,
-      po: detailsForm.po ? { document_url: detailsForm.po, added_at: detailsForm.po_added_at || new Date().toISOString() } : null,
-      contract_agreement: detailsForm.contract_agreement ? { document_url: detailsForm.contract_agreement, added_at: detailsForm.contract_agreement_added_at || new Date().toISOString() } : null,
-      warranty: detailsForm.warranty ? { document_url: detailsForm.warranty, added_at: detailsForm.warranty_added_at || new Date().toISOString() } : null,
-      pbg: detailsForm.pbg ? { document_url: detailsForm.pbg, added_at: detailsForm.pbg_added_at || new Date().toISOString() } : null,
-      insurance: detailsForm.insurance ? { document_url: detailsForm.insurance, added_at: detailsForm.insurance_added_at || new Date().toISOString() } : null,
-      acceptance_letter: detailsForm.acceptance_letter ? { document_url: detailsForm.acceptance_letter, added_at: detailsForm.acceptance_letter_added_at || new Date().toISOString() } : null,
-      npv_bond: detailsForm.npv_bond ? { document_url: detailsForm.npv_bond, added_at: detailsForm.npv_bond_added_at || new Date().toISOString() } : null
+      acceptance_pdf: detailsForm.counter_offer.acceptance_pdf || '',
+      non_acceptance_pdf: detailsForm.counter_offer.non_acceptance_pdf || ''
     };
+    if (!isCounterOfferEqual(selectedTender.counter_offer, propCOForCompare)) {
+      payload.counter_offer = {
+        counter_offer: propCOForCompare.enabled,
+        sent_for_approval: propCOForCompare.sent_for_approval,
+        ...(propCOForCompare.sent_for_approval_at ? { sent_for_approval_at: propCOForCompare.sent_for_approval_at } : {}),
+        counter_offer_approve_by_md: propCOForCompare.counter_offer_approve_by_md,
+        ...(propCOForCompare.counter_offer_approve_by_md_at ? { counter_offer_approve_by_md_at: propCOForCompare.counter_offer_approve_by_md_at } : { counter_offer_approve_by_md_at: null }),
+        documents: propCOForCompare.documents,
+        acceptance_pdf: propCOForCompare.acceptance_pdf || null,
+        non_acceptance_pdf: propCOForCompare.non_acceptance_pdf || null
+      };
+    }
 
     const token = localStorage.getItem('token') || '';
 
@@ -1031,25 +1152,25 @@ export default function TendersListView() {
           if (!prev) return null;
           return {
             ...prev,
-            shortfall: payload.shortfall,
-            docs_resubmitted: payload.docs_resubmitted,
-            rank_file: payload.rank_file,
-            fee_document: payload.fee_document,
-            technical_document: payload.technical_document,
-            boq_filled: payload.boq_filled,
-            courier: payload.courier,
-            submission_actual: payload.submission_actual,
-            submit_to_govt_portal_slip: payload.submit_to_govt_portal_slip,
-            a9slip: payload.a9slip,
-            counter_offer: payload.counter_offer,
-            loi: payload.loi,
-            po: payload.po,
-            contract_agreement: payload.contract_agreement,
-            warranty: payload.warranty,
-            pbg: payload.pbg,
-            insurance: payload.insurance,
-            acceptance_letter: payload.acceptance_letter,
-            npv_bond: payload.npv_bond,
+            ...(payload.hasOwnProperty('shortfall') ? { shortfall: payload.shortfall } : {}),
+            ...(payload.hasOwnProperty('docs_resubmitted') ? { docs_resubmitted: payload.docs_resubmitted } : {}),
+            ...(payload.hasOwnProperty('rank_file') ? { rank_file: payload.rank_file } : {}),
+            ...(payload.hasOwnProperty('fee_document') ? { fee_document: payload.fee_document } : {}),
+            ...(payload.hasOwnProperty('technical_document') ? { technical_document: payload.technical_document } : {}),
+            ...(payload.hasOwnProperty('boq_filled') ? { boq_filled: payload.boq_filled } : {}),
+            ...(payload.hasOwnProperty('courier') ? { courier: payload.courier } : {}),
+            ...(payload.hasOwnProperty('submission_actual') ? { submission_actual: payload.submission_actual } : {}),
+            ...(payload.hasOwnProperty('submit_to_govt_portal_slip') ? { submit_to_govt_portal_slip: payload.submit_to_govt_portal_slip } : {}),
+            ...(payload.hasOwnProperty('a9slip') ? { a9slip: payload.a9slip } : {}),
+            ...(payload.hasOwnProperty('counter_offer') ? { counter_offer: payload.counter_offer } : {}),
+            ...(payload.hasOwnProperty('loi') ? { loi: payload.loi } : {}),
+            ...(payload.hasOwnProperty('po') ? { po: payload.po } : {}),
+            ...(payload.hasOwnProperty('contract_agreement') ? { contract_agreement: payload.contract_agreement } : {}),
+            ...(payload.hasOwnProperty('warranty') ? { warranty: payload.warranty } : {}),
+            ...(payload.hasOwnProperty('pbg') ? { pbg: payload.pbg } : {}),
+            ...(payload.hasOwnProperty('insurance') ? { insurance: payload.insurance } : {}),
+            ...(payload.hasOwnProperty('acceptance_letter') ? { acceptance_letter: payload.acceptance_letter } : {}),
+            ...(payload.hasOwnProperty('npv_bond') ? { npv_bond: payload.npv_bond } : {}),
             tender_completed_at: isMarkComplete ? completedAt : prev.tender_completed_at
           };
         });
