@@ -90,8 +90,8 @@ const isDocsResubmittedEqual = (arrA, arrB) => {
   if (cleanA.length !== cleanB.length) return false;
   for (let i = 0; i < cleanA.length; i++) {
     if (cleanA[i].document_name !== cleanB[i].document_name ||
-        cleanA[i].document_url !== cleanB[i].document_url ||
-        cleanA[i].reason !== cleanB[i].reason) {
+      cleanA[i].document_url !== cleanB[i].document_url ||
+      cleanA[i].reason !== cleanB[i].reason) {
       return false;
     }
   }
@@ -100,7 +100,7 @@ const isDocsResubmittedEqual = (arrA, arrB) => {
 
 const isCounterOfferEqual = (origCO, propCO) => {
   if (!origCO && !propCO) return true;
-  
+
   const origEnabled = origCO ? (origCO.counter_offer !== undefined ? !!origCO.counter_offer : !!origCO.enabled) : false;
   const origSent = origCO ? !!origCO.sent_for_approval : false;
   const origSentAt = origCO ? (origCO.sent_for_approval_at || '') : '';
@@ -130,9 +130,9 @@ const isCounterOfferEqual = (origCO, propCO) => {
   const propNonAcceptPdf = propCO?.non_acceptance_pdf || '';
   const propDocs = propEnabled
     ? (propCO?.documents || []).map(d => ({
-        url: d.url || '',
-        remark: d.remark || ''
-      }))
+      url: d.url || '',
+      remark: d.remark || ''
+    }))
     : [];
 
   if (origEnabled !== propEnabled) return false;
@@ -993,7 +993,7 @@ export default function TendersListView() {
     }
 
     const currentTimestamp = new Date();
-    
+
     // Construct dynamic payload containing only changes
     const payload = {
       id: selectedTender.id
@@ -1030,9 +1030,9 @@ export default function TendersListView() {
       if (origUrl !== propUrl) {
         payload[field] = propUrl
           ? {
-              document_url: propUrl,
-              added_at: detailsForm[`${field}_added_at`] || new Date().toISOString()
-            }
+            document_url: propUrl,
+            added_at: detailsForm[`${field}_added_at`] || new Date().toISOString()
+          }
           : null;
       }
     }
@@ -1044,9 +1044,9 @@ export default function TendersListView() {
       if (origUrl !== propUrl) {
         payload[field] = propUrl
           ? {
-              document_url: propUrl,
-              ...(detailsForm[`${field}_added_at`] ? { added_at: detailsForm[`${field}_added_at`] } : {})
-            }
+            document_url: propUrl,
+            ...(detailsForm[`${field}_added_at`] ? { added_at: detailsForm[`${field}_added_at`] } : {})
+          }
           : null;
       }
     }
@@ -2444,6 +2444,54 @@ export default function TendersListView() {
                   <div>
                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Tender Fee / EMD</span>
                     <span className="text-xs font-semibold text-slate-700">₹{Number(selectedTender.tender_fee_inr || 0).toFixed(2)} / ₹{Number(selectedTender.emd_inr || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Sent for approval Card */}
+                <div className="p-4 bg-slate-50/70 border border-slate-150 rounded-xl space-y-3 animate-fadeIn">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Sent for approval</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase">Planned</span>
+                      <span className="text-xs font-semibold text-slate-700">
+                        {selectedTender.created_at ? (() => {
+                          const d = new Date(selectedTender.created_at + (selectedTender.created_at.endsWith('Z') ? '' : 'Z'));
+                          d.setDate(d.getDate() + 2);
+                          return formatToIST(d);
+                        })() : 'N/A'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+                      <span className="text-xs font-semibold text-slate-700">
+                        {selectedTender.send_for_approval_at ? formatToIST(selectedTender.send_for_approval_at) : 'NA'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Late</span>
+                      <span className="text-xs font-bold">
+                        {(() => {
+                          if (!selectedTender.send_for_approval_at || !selectedTender.created_at) {
+                            return <span className="text-slate-400 font-semibold">NA</span>;
+                          }
+                          try {
+                            const planned = new Date(selectedTender.created_at);
+                            planned.setDate(planned.getDate() + 2);
+                            const actual = new Date(selectedTender.send_for_approval_at);
+                            if (isNaN(planned.getTime()) || isNaN(actual.getTime())) {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                            if (planned.getTime() >= actual.getTime()) {
+                              return <span className="text-emerald-600 font-bold">On Time</span>;
+                            } else {
+                              return <span className="text-rose-600 font-bold">Late</span>;
+                            }
+                          } catch {
+                            return <span className="text-slate-400 font-semibold">NA</span>;
+                          }
+                        })()}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
