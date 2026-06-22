@@ -63,6 +63,99 @@ const formatDate = (dateString) => {
   }
 };
 
+const getOriginalDocUrl = (tender, fieldName) => {
+  if (!tender) return '';
+  const val = tender[fieldName];
+  if (!val) return '';
+  if (typeof val === 'object') {
+    return val.document_url || val.url || '';
+  }
+  if (typeof val === 'string') {
+    return val;
+  }
+  return '';
+};
+
+const isDocsResubmittedEqual = (arrA, arrB) => {
+  const cleanA = (arrA || []).map(d => ({
+    document_name: d.document_name || d.name || d.fileName || '',
+    document_url: d.document_url || d.url || '',
+    reason: d.reason || ''
+  }));
+  const cleanB = (arrB || []).map(d => ({
+    document_name: d.document_name || d.name || d.fileName || '',
+    document_url: d.document_url || d.url || '',
+    reason: d.reason || ''
+  }));
+  if (cleanA.length !== cleanB.length) return false;
+  for (let i = 0; i < cleanA.length; i++) {
+    if (cleanA[i].document_name !== cleanB[i].document_name ||
+      cleanA[i].document_url !== cleanB[i].document_url ||
+      cleanA[i].reason !== cleanB[i].reason) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const isCounterOfferEqual = (origCO, propCO) => {
+  if (!origCO && !propCO) return true;
+
+  const origEnabled = origCO ? (origCO.counter_offer !== undefined ? !!origCO.counter_offer : !!origCO.enabled) : false;
+  const origSent = origCO ? !!origCO.sent_for_approval : false;
+  const origSentAt = origCO ? (origCO.sent_for_approval_at || '') : '';
+  const origApproveMD = origCO ? !!origCO.counter_offer_approve_by_md : false;
+  const origApproveMDAt = origCO ? (origCO.counter_offer_approve_by_md_at || null) : null;
+  const origAcceptPdf = origCO ? (origCO.acceptance_pdf || '') : '';
+  const origNonAcceptPdf = origCO ? (origCO.non_acceptance_pdf || '') : '';
+  const origDeadline = origCO ? (origCO.counter_offer_deadline || '') : '';
+
+  let origDocs = [];
+  if (origCO) {
+    if (Array.isArray(origCO.documents)) {
+      origDocs = origCO.documents.map(d => ({
+        url: d.url || d.document_url || '',
+        remark: d.remark || ''
+      }));
+    } else if (origCO.doc_url) {
+      origDocs = [{ url: origCO.doc_url, remark: '' }];
+    }
+  }
+
+  const propEnabled = !!propCO?.enabled;
+  const propSent = !!propCO?.sent_for_approval;
+  const propSentAt = propCO?.sent_for_approval_at || '';
+  const propApproveMD = !!propCO?.counter_offer_approve_by_md;
+  const propApproveMDAt = propCO?.counter_offer_approve_by_md_at || null;
+  const propAcceptPdf = propCO?.acceptance_pdf || '';
+  const propNonAcceptPdf = propCO?.non_acceptance_pdf || '';
+  const propDeadline = propCO?.counter_offer_deadline || '';
+  const propDocs = propEnabled
+    ? (propCO?.documents || []).map(d => ({
+      url: d.url || '',
+      remark: d.remark || ''
+    }))
+    : [];
+
+  if (origEnabled !== propEnabled) return false;
+  if (origSent !== propSent) return false;
+  if (origSentAt !== propSentAt) return false;
+  if (origApproveMD !== propApproveMD) return false;
+  if (origApproveMDAt !== propApproveMDAt) return false;
+  if (origAcceptPdf !== propAcceptPdf) return false;
+  if (origNonAcceptPdf !== propNonAcceptPdf) return false;
+  if (origDeadline !== propDeadline) return false;
+
+  if (origDocs.length !== propDocs.length) return false;
+  for (let i = 0; i < origDocs.length; i++) {
+    if (origDocs[i].url !== propDocs[i].url || origDocs[i].remark !== propDocs[i].remark) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 export default function TendersListView() {
   const [tenders, setTenders] = useState([]);
   const [activeTab, setActiveTab] = useState('Active Tenders');
@@ -122,7 +215,8 @@ export default function TendersListView() {
       counter_offer_approve_by_md: false,
       counter_offer_approve_by_md_at: null,
       acceptance_pdf: '',
-      non_acceptance_pdf: ''
+      non_acceptance_pdf: '',
+      counter_offer_deadline: ''
     },
     loi: '',
     loi_fileName: '',
@@ -467,7 +561,8 @@ export default function TendersListView() {
             counter_offer_approve_by_md: false,
             counter_offer_approve_by_md_at: null,
             acceptance_pdf: '',
-            non_acceptance_pdf: ''
+            non_acceptance_pdf: '',
+            counter_offer_deadline: ''
           };
         }
         const enabled = tender.counter_offer.counter_offer !== undefined
@@ -480,6 +575,7 @@ export default function TendersListView() {
         const counter_offer_approve_by_md_at = tender.counter_offer.counter_offer_approve_by_md_at || null;
         const acceptance_pdf = tender.counter_offer.acceptance_pdf || '';
         const non_acceptance_pdf = tender.counter_offer.non_acceptance_pdf || '';
+        const counter_offer_deadline = tender.counter_offer.counter_offer_deadline || '';
 
         let documents = [];
         if (Array.isArray(tender.counter_offer.documents)) {
@@ -508,7 +604,8 @@ export default function TendersListView() {
           counter_offer_approve_by_md,
           counter_offer_approve_by_md_at,
           acceptance_pdf,
-          non_acceptance_pdf
+          non_acceptance_pdf,
+          counter_offer_deadline
         };
       })(),
       loi: (tender.loi && typeof tender.loi === 'object') ? (tender.loi.document_url || '') : (typeof tender.loi === 'string' ? tender.loi : ''),
@@ -768,6 +865,10 @@ export default function TendersListView() {
   };
 
   const handleSendCounterOfferForApproval = async () => {
+    if (!detailsForm.counter_offer.counter_offer_deadline) {
+      alert('Please select a deadline before sending the counter offer for approval.');
+      return;
+    }
     if (detailsForm.counter_offer.documents.some(d => d.uploading)) {
       alert('Please wait for files to finish uploading before sending for approval.');
       return;
@@ -903,108 +1004,135 @@ export default function TendersListView() {
     }
 
     const currentTimestamp = new Date();
+
+    // Construct dynamic payload containing only changes
     const payload = {
-      id: selectedTender.id,
-      shortfall: detailsForm.shortfall,
-      docs_resubmitted: detailsForm.shortfall
-        ? detailsForm.docs_resubmitted.map(d => ({
-          document_name: d.document_name || d.fileName || '',
-          document_url: d.document_url || d.url || '',
-          reason: d.reason || '',
-          ...(d.added_at ? { added_at: d.added_at } : {})
+      id: selectedTender.id
+    };
+
+    // 1. shortfall check
+    const origShortfall = !!selectedTender.shortfall;
+    const propShortfall = !!detailsForm.shortfall;
+    if (origShortfall !== propShortfall) {
+      payload.shortfall = propShortfall;
+    }
+
+    // 2. docs_resubmitted check
+    const propDocsResubmitted = detailsForm.shortfall
+      ? detailsForm.docs_resubmitted.map(d => ({
+        document_name: d.document_name || d.fileName || '',
+        document_url: d.document_url || d.url || '',
+        reason: d.reason || '',
+        ...(d.added_at ? { added_at: d.added_at } : {})
+      }))
+      : [];
+    if (!isDocsResubmittedEqual(selectedTender.docs_resubmitted, propDocsResubmitted)) {
+      payload.docs_resubmitted = propDocsResubmitted;
+    }
+
+    // 3. Document fields checks
+    const standardDocFields = [
+      'fee_document', 'technical_document', 'boq_filled', 'loi', 'po',
+      'contract_agreement', 'warranty', 'pbg', 'insurance', 'acceptance_letter', 'npv_bond'
+    ];
+    for (const field of standardDocFields) {
+      const origUrl = getOriginalDocUrl(selectedTender, field);
+      const propUrl = detailsForm[field] || '';
+      if (origUrl !== propUrl) {
+        payload[field] = propUrl
+          ? {
+            document_url: propUrl,
+            added_at: detailsForm[`${field}_added_at`] || new Date().toISOString()
+          }
+          : null;
+      }
+    }
+
+    const customDocFields = ['rank_file', 'submit_to_govt_portal_slip', 'a9slip'];
+    for (const field of customDocFields) {
+      const origUrl = getOriginalDocUrl(selectedTender, field);
+      const propUrl = detailsForm[field] || '';
+      if (origUrl !== propUrl) {
+        payload[field] = propUrl
+          ? {
+            document_url: propUrl,
+            ...(detailsForm[`${field}_added_at`] ? { added_at: detailsForm[`${field}_added_at`] } : {})
+          }
+          : null;
+      }
+    }
+
+    // 4. courier check
+    const origCourierStatus = !!selectedTender.courier?.courier_status;
+    const origCourierAddedAt = selectedTender.courier?.added_at || '';
+    const propCourierStatus = !!detailsForm.courier?.courier_status;
+    const propCourierAddedAt = propCourierStatus ? (detailsForm.courier?.added_at || '') : '';
+    if (origCourierStatus !== propCourierStatus || origCourierAddedAt !== propCourierAddedAt) {
+      payload.courier = {
+        courier_status: propCourierStatus,
+        added_at: propCourierStatus
+          ? (detailsForm.courier?.added_at || new Date().toISOString())
+          : null
+      };
+    }
+
+    // 5. submission_actual check
+    const origSubmissionStatus = !!selectedTender.submission_actual?.submission_actual_status;
+    const origSubmissionAddedAt = selectedTender.submission_actual?.added_at || '';
+    const propSubmissionStatus = !!detailsForm.submission_actual?.submission_actual_status;
+    const propSubmissionAddedAt = propSubmissionStatus ? (detailsForm.submission_actual?.added_at || '') : '';
+    if (origSubmissionStatus !== propSubmissionStatus || origSubmissionAddedAt !== propSubmissionAddedAt) {
+      payload.submission_actual = {
+        submission_actual_status: propSubmissionStatus,
+        added_at: propSubmissionStatus
+          ? (detailsForm.submission_actual?.added_at || new Date().toISOString())
+          : null
+      };
+    }
+
+    // 6. counter_offer check
+    const propCOForCompare = {
+      enabled: !!counterOfferOverride ? !!counterOfferOverride.enabled : !!detailsForm.counter_offer.enabled,
+      sent_for_approval: !!counterOfferOverride ? !!counterOfferOverride.sent_for_approval : !!detailsForm.counter_offer.sent_for_approval,
+      sent_for_approval_at: (counterOfferOverride ? counterOfferOverride.sent_for_approval_at : detailsForm.counter_offer.sent_for_approval_at) || '',
+      counter_offer_approve_by_md: !!counterOfferOverride ? !!counterOfferOverride.counter_offer_approve_by_md : !!detailsForm.counter_offer.counter_offer_approve_by_md,
+      counter_offer_approve_by_md_at: (counterOfferOverride ? counterOfferOverride.counter_offer_approve_by_md_at : detailsForm.counter_offer.counter_offer_approve_by_md_at) || null,
+      documents: (counterOfferOverride ? counterOfferOverride.enabled : detailsForm.counter_offer.enabled)
+        ? (counterOfferOverride ? counterOfferOverride.documents : detailsForm.counter_offer.documents).map(d => ({
+          url: d.url || '',
+          remark: d.remark || ''
         }))
         : [],
-      rank_file: detailsForm.rank_file
-        ? {
-          document_url: detailsForm.rank_file,
-          ...(detailsForm.rank_file_added_at ? { added_at: detailsForm.rank_file_added_at } : {})
-        }
-        : null,
-      fee_document: detailsForm.fee_document
-        ? {
-          document_url: detailsForm.fee_document,
-          added_at: detailsForm.fee_document_added_at || new Date().toISOString()
-        }
-        : null,
-      technical_document: detailsForm.technical_document
-        ? {
-          document_url: detailsForm.technical_document,
-          added_at: detailsForm.technical_document_added_at || new Date().toISOString()
-        }
-        : null,
-      boq_filled: detailsForm.boq_filled
-        ? {
-          document_url: detailsForm.boq_filled,
-          added_at: detailsForm.boq_filled_added_at || new Date().toISOString()
-        }
-        : null,
-      courier: {
-        courier_status: !!detailsForm.courier?.courier_status,
-        added_at: detailsForm.courier?.courier_status
-          ? (detailsForm.courier.added_at || new Date().toISOString())
-          : null
-      },
-      submission_actual: {
-        submission_actual_status: !!detailsForm.submission_actual?.submission_actual_status,
-        added_at: detailsForm.submission_actual?.submission_actual_status
-          ? (detailsForm.submission_actual.added_at || new Date().toISOString())
-          : null
-      },
-      submit_to_govt_portal_slip: detailsForm.submit_to_govt_portal_slip
-        ? {
-          document_url: detailsForm.submit_to_govt_portal_slip,
-          ...(detailsForm.submit_to_govt_portal_slip_added_at ? { added_at: detailsForm.submit_to_govt_portal_slip_added_at } : {})
-        }
-        : null,
-      a9slip: detailsForm.a9slip
-        ? {
-          document_url: detailsForm.a9slip,
-          ...(detailsForm.a9slip_added_at ? { added_at: detailsForm.a9slip_added_at } : {})
-        }
-        : null,
-      counter_offer: {
-        counter_offer: !!counterOfferOverride ? !!counterOfferOverride.enabled : !!detailsForm.counter_offer.enabled,
-        sent_for_approval: !!counterOfferOverride ? !!counterOfferOverride.sent_for_approval : !!detailsForm.counter_offer.sent_for_approval,
-        ...((counterOfferOverride ? counterOfferOverride.sent_for_approval_at : detailsForm.counter_offer.sent_for_approval_at) ? { sent_for_approval_at: (counterOfferOverride ? counterOfferOverride.sent_for_approval_at : detailsForm.counter_offer.sent_for_approval_at) } : {}),
-        counter_offer_approve_by_md: !!counterOfferOverride ? !!counterOfferOverride.counter_offer_approve_by_md : !!detailsForm.counter_offer.counter_offer_approve_by_md,
-        ...((counterOfferOverride ? counterOfferOverride.counter_offer_approve_by_md_at : detailsForm.counter_offer.counter_offer_approve_by_md_at) ? { counter_offer_approve_by_md_at: (counterOfferOverride ? counterOfferOverride.counter_offer_approve_by_md_at : detailsForm.counter_offer.counter_offer_approve_by_md_at) } : { counter_offer_approve_by_md_at: null }),
-        documents: (counterOfferOverride ? counterOfferOverride.enabled : detailsForm.counter_offer.enabled)
-          ? (counterOfferOverride ? counterOfferOverride.documents : detailsForm.counter_offer.documents).map(d => ({
-            url: d.url || '',
-            remark: d.remark || ''
-          }))
-          : [],
-        acceptance_pdf: detailsForm.counter_offer.acceptance_pdf || null,
-        non_acceptance_pdf: detailsForm.counter_offer.non_acceptance_pdf || null
-      },
-      loi: detailsForm.loi ? { document_url: detailsForm.loi, added_at: detailsForm.loi_added_at || new Date().toISOString() } : null,
-      po: detailsForm.po ? { document_url: detailsForm.po, added_at: detailsForm.po_added_at || new Date().toISOString() } : null,
-      contract_agreement: detailsForm.contract_agreement ? { document_url: detailsForm.contract_agreement, added_at: detailsForm.contract_agreement_added_at || new Date().toISOString() } : null,
-      warranty: detailsForm.warranty ? { document_url: detailsForm.warranty, added_at: detailsForm.warranty_added_at || new Date().toISOString() } : null,
-      pbg: detailsForm.pbg ? { document_url: detailsForm.pbg, added_at: detailsForm.pbg_added_at || new Date().toISOString() } : null,
-      insurance: detailsForm.insurance ? { document_url: detailsForm.insurance, added_at: detailsForm.insurance_added_at || new Date().toISOString() } : null,
-      acceptance_letter: detailsForm.acceptance_letter ? { document_url: detailsForm.acceptance_letter, added_at: detailsForm.acceptance_letter_added_at || new Date().toISOString() } : null,
-      npv_bond: detailsForm.npv_bond ? { document_url: detailsForm.npv_bond, added_at: detailsForm.npv_bond_added_at || new Date().toISOString() } : null
+      acceptance_pdf: detailsForm.counter_offer.acceptance_pdf || '',
+      non_acceptance_pdf: detailsForm.counter_offer.non_acceptance_pdf || '',
+      counter_offer_deadline: detailsForm.counter_offer.counter_offer_deadline || ''
     };
+    if (!isCounterOfferEqual(selectedTender.counter_offer, propCOForCompare)) {
+      payload.counter_offer = {
+        counter_offer: propCOForCompare.enabled,
+        sent_for_approval: propCOForCompare.sent_for_approval,
+        ...(propCOForCompare.sent_for_approval_at ? { sent_for_approval_at: propCOForCompare.sent_for_approval_at } : {}),
+        counter_offer_approve_by_md: propCOForCompare.counter_offer_approve_by_md,
+        ...(propCOForCompare.counter_offer_approve_by_md_at ? { counter_offer_approve_by_md_at: propCOForCompare.counter_offer_approve_by_md_at } : { counter_offer_approve_by_md_at: null }),
+        documents: propCOForCompare.documents,
+        acceptance_pdf: propCOForCompare.acceptance_pdf || null,
+        non_acceptance_pdf: propCOForCompare.non_acceptance_pdf || null,
+        counter_offer_deadline: propCOForCompare.counter_offer_deadline || null
+      };
+    }
 
     const token = localStorage.getItem('token') || '';
 
+    // Check if anything has changed
+    const hasChanges = Object.keys(payload).length > 1;
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/update-tender-details`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
+      let completedAt = null;
 
-      const resData = await response.json().catch(() => null);
-
-      if (response.ok && resData?.status === 'success') {
-        let completedAt = null;
-
+      if (!hasChanges) {
+        // No changes to save
         if (isMarkComplete) {
+          // If marking as complete, we proceed directly to complete the tender
           const completeResponse = await fetch(`${API_BASE_URL}/api/v1/tenders/mark-as-complete-tender-after-approved-by-md/${selectedTender.id}`, {
             method: 'PUT',
             headers: {
@@ -1023,33 +1151,15 @@ export default function TendersListView() {
             return;
           }
         } else {
+          // No changes and not marking complete, just show success directly
           setDetailsSaveSuccess('Tender details updated successfully!');
         }
 
-        // Refresh local selectedTender so any display in the modal gets synced
+        // Update local state (even though no details changed, completed status may have changed)
         setSelectedTender(prev => {
           if (!prev) return null;
           return {
             ...prev,
-            shortfall: payload.shortfall,
-            docs_resubmitted: payload.docs_resubmitted,
-            rank_file: payload.rank_file,
-            fee_document: payload.fee_document,
-            technical_document: payload.technical_document,
-            boq_filled: payload.boq_filled,
-            courier: payload.courier,
-            submission_actual: payload.submission_actual,
-            submit_to_govt_portal_slip: payload.submit_to_govt_portal_slip,
-            a9slip: payload.a9slip,
-            counter_offer: payload.counter_offer,
-            loi: payload.loi,
-            po: payload.po,
-            contract_agreement: payload.contract_agreement,
-            warranty: payload.warranty,
-            pbg: payload.pbg,
-            insurance: payload.insurance,
-            acceptance_letter: payload.acceptance_letter,
-            npv_bond: payload.npv_bond,
             tender_completed_at: isMarkComplete ? completedAt : prev.tender_completed_at
           };
         });
@@ -1060,8 +1170,80 @@ export default function TendersListView() {
         setTimeout(() => {
           setDetailsSaveSuccess('');
         }, 3000);
+
       } else {
-        setDetailsSaveError(resData?.message || resData?.error || 'Failed to update tender details.');
+        // We have changes, so make the update call
+        const response = await fetch(`${API_BASE_URL}/api/v1/tenders/update-tender-details`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const resData = await response.json().catch(() => null);
+
+        if (response.ok && resData?.status === 'success') {
+          if (isMarkComplete) {
+            const completeResponse = await fetch(`${API_BASE_URL}/api/v1/tenders/mark-as-complete-tender-after-approved-by-md/${selectedTender.id}`, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            const completeData = await completeResponse.json().catch(() => null);
+
+            if (completeResponse.ok && completeData?.status === 'success') {
+              completedAt = completeData.data?.tender_completed_at || new Date().toISOString();
+              setDetailsSaveSuccess('Tender details updated and marked as complete successfully!');
+            } else {
+              setDetailsSaveError(completeData?.message || completeData?.error || 'Failed to mark tender as complete.');
+              setIsSavingDetails(false);
+              return;
+            }
+          } else {
+            setDetailsSaveSuccess('Tender details updated successfully!');
+          }
+
+          // Refresh local selectedTender so any display in the modal gets synced
+          setSelectedTender(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              ...(payload.hasOwnProperty('shortfall') ? { shortfall: payload.shortfall } : {}),
+              ...(payload.hasOwnProperty('docs_resubmitted') ? { docs_resubmitted: payload.docs_resubmitted } : {}),
+              ...(payload.hasOwnProperty('rank_file') ? { rank_file: payload.rank_file } : {}),
+              ...(payload.hasOwnProperty('fee_document') ? { fee_document: payload.fee_document } : {}),
+              ...(payload.hasOwnProperty('technical_document') ? { technical_document: payload.technical_document } : {}),
+              ...(payload.hasOwnProperty('boq_filled') ? { boq_filled: payload.boq_filled } : {}),
+              ...(payload.hasOwnProperty('courier') ? { courier: payload.courier } : {}),
+              ...(payload.hasOwnProperty('submission_actual') ? { submission_actual: payload.submission_actual } : {}),
+              ...(payload.hasOwnProperty('submit_to_govt_portal_slip') ? { submit_to_govt_portal_slip: payload.submit_to_govt_portal_slip } : {}),
+              ...(payload.hasOwnProperty('a9slip') ? { a9slip: payload.a9slip } : {}),
+              ...(payload.hasOwnProperty('counter_offer') ? { counter_offer: payload.counter_offer } : {}),
+              ...(payload.hasOwnProperty('loi') ? { loi: payload.loi } : {}),
+              ...(payload.hasOwnProperty('po') ? { po: payload.po } : {}),
+              ...(payload.hasOwnProperty('contract_agreement') ? { contract_agreement: payload.contract_agreement } : {}),
+              ...(payload.hasOwnProperty('warranty') ? { warranty: payload.warranty } : {}),
+              ...(payload.hasOwnProperty('pbg') ? { pbg: payload.pbg } : {}),
+              ...(payload.hasOwnProperty('insurance') ? { insurance: payload.insurance } : {}),
+              ...(payload.hasOwnProperty('acceptance_letter') ? { acceptance_letter: payload.acceptance_letter } : {}),
+              ...(payload.hasOwnProperty('npv_bond') ? { npv_bond: payload.npv_bond } : {}),
+              tender_completed_at: isMarkComplete ? completedAt : prev.tender_completed_at
+            };
+          });
+
+          // Reload the main dashboard list
+          await loadTenders();
+
+          setTimeout(() => {
+            setDetailsSaveSuccess('');
+          }, 3000);
+        } else {
+          setDetailsSaveError(resData?.message || resData?.error || 'Failed to update tender details.');
+        }
       }
     } catch (err) {
       console.error(err);
@@ -2326,6 +2508,167 @@ export default function TendersListView() {
                   </div>
                 </div>
 
+                {/* Sent for approval Card */}
+                <div className="p-4 bg-slate-50/70 border border-slate-150 rounded-xl space-y-3 animate-fadeIn">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Sent for approval</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase">Planned</span>
+                      <span className="text-xs font-semibold text-slate-700">
+                        {selectedTender.created_at ? (() => {
+                          const d = new Date(selectedTender.created_at + (selectedTender.created_at.endsWith('Z') ? '' : 'Z'));
+                          d.setDate(d.getDate() + 2);
+                          return formatToIST(d);
+                        })() : 'N/A'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+                      <span className="text-xs font-semibold text-slate-700">
+                        {selectedTender.send_for_approval_at ? formatToIST(selectedTender.send_for_approval_at) : 'NA'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Late</span>
+                      <span className="text-xs font-bold">
+                        {(() => {
+                          if (!selectedTender.send_for_approval_at || !selectedTender.created_at) {
+                            return <span className="text-slate-400 font-semibold">NA</span>;
+                          }
+                          try {
+                            const planned = new Date(selectedTender.created_at);
+                            planned.setDate(planned.getDate() + 2);
+                            const actual = new Date(selectedTender.send_for_approval_at);
+                            if (isNaN(planned.getTime()) || isNaN(actual.getTime())) {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                            if (planned.getTime() >= actual.getTime()) {
+                              return <span className="text-emerald-600 font-bold">On Time</span>;
+                            } else {
+                              return <span className="text-rose-600 font-bold">Late</span>;
+                            }
+                          } catch {
+                            return <span className="text-slate-400 font-semibold">NA</span>;
+                          }
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Upload Submission Slip Card */}
+                {(activeTab === 'Approved By MD Tenders' || activeTab === 'Submitted Tenders') && (
+                  <div className="p-4 bg-slate-50/70 border border-slate-150 rounded-xl space-y-3 animate-fadeIn mt-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Upload Submission Slip</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Planned</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.approved_at ? (() => {
+                            const d = new Date(selectedTender.approved_at + (selectedTender.approved_at.endsWith('Z') ? '' : 'Z'));
+                            d.setDate(d.getDate() + 5);
+                            return formatToIST(d);
+                          })() : 'N/A'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.a9slip?.added_at ? formatToIST(selectedTender.a9slip.added_at) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Late</span>
+                        <span className="text-xs font-bold">
+                          {(() => {
+                            if (!selectedTender.a9slip?.added_at || !selectedTender.approved_at) {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                            try {
+                              const planned = new Date(selectedTender.approved_at + (selectedTender.approved_at.endsWith('Z') ? '' : 'Z'));
+                              planned.setDate(planned.getDate() + 5);
+                              const actual = new Date(selectedTender.a9slip.added_at);
+                              if (isNaN(planned.getTime()) || isNaN(actual.getTime())) {
+                                return <span className="text-slate-400 font-semibold">NA</span>;
+                              }
+                              if (planned.getTime() >= actual.getTime()) {
+                                return <span className="text-emerald-600 font-bold">On Time</span>;
+                              } else {
+                                return <span className="text-rose-600 font-bold">Late</span>;
+                              }
+                            } catch {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Counter Offer Approval From MD Card */}
+                {(selectedTender.counter_offer?.enabled || selectedTender.counter_offer?.counter_offer) && (
+                  <div className="p-4 bg-slate-50/70 border border-slate-150 rounded-xl space-y-3 animate-fadeIn mt-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Counter Offer Approval From MD</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Sent on</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.counter_offer?.sent_for_approval_at ? formatToIST(selectedTender.counter_offer.sent_for_approval_at) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Deadline</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.counter_offer?.counter_offer_deadline ? formatToIST(new Date(selectedTender.counter_offer.counter_offer_deadline)) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Planned</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.counter_offer?.counter_offer_deadline ? (() => {
+                            const d = new Date(selectedTender.counter_offer.counter_offer_deadline);
+                            if (isNaN(d.getTime())) return 'NA';
+                            d.setDate(d.getDate() - 1);
+                            return formatToIST(d);
+                          })() : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.counter_offer?.counter_offer_approve_by_md_at ? formatToIST(selectedTender.counter_offer.counter_offer_approve_by_md_at) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Late</span>
+                        <span className="text-xs font-bold">
+                          {(() => {
+                            if (!selectedTender.counter_offer?.counter_offer_approve_by_md_at || !selectedTender.counter_offer?.counter_offer_deadline) {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                            try {
+                              const deadline = new Date(selectedTender.counter_offer.counter_offer_deadline);
+                              if (isNaN(deadline.getTime())) return <span className="text-slate-400 font-semibold">NA</span>;
+                              const planned = new Date(deadline);
+                              planned.setDate(planned.getDate() - 1);
+                              const actual = new Date(selectedTender.counter_offer.counter_offer_approve_by_md_at);
+                              if (isNaN(actual.getTime())) return <span className="text-slate-400 font-semibold">NA</span>;
+                              if (planned.getTime() >= actual.getTime()) {
+                                return <span className="text-emerald-600 font-bold">On Time</span>;
+                              } else {
+                                return <span className="text-rose-600 font-bold">Late</span>;
+                              }
+                            } catch {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Documents List */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tender Documents</h4>
@@ -2633,6 +2976,29 @@ export default function TendersListView() {
 
                           {detailsForm.counter_offer.enabled && (
                             <div className="space-y-3 border-t border-slate-200/50 pt-3">
+                              {/* Deadline picker */}
+                              <div className="mb-4 animate-fadeIn">
+                                <label className="block text-[10px] font-bold text-slate-550 uppercase mb-1">
+                                  Deadline <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                  type="datetime-local"
+                                  value={detailsForm.counter_offer.counter_offer_deadline || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setDetailsForm(prev => ({
+                                      ...prev,
+                                      counter_offer: {
+                                        ...prev.counter_offer,
+                                        counter_offer_deadline: val
+                                      }
+                                    }));
+                                  }}
+                                  disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval || detailsForm.counter_offer.counter_offer_approve_by_md}
+                                  className="w-full px-2.5 py-1.5 border border-slate-200 bg-white rounded text-xs focus:outline-none focus:border-sky-500 text-slate-800 disabled:bg-slate-50 disabled:text-slate-400"
+                                />
+                              </div>
+
                               <div className="space-y-3">
                                 {detailsForm.counter_offer.documents.map((doc, idx) => (
                                   <div key={idx} className="flex gap-3 items-end bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
@@ -2786,7 +3152,7 @@ export default function TendersListView() {
                                   <button
                                     type="button"
                                     onClick={handleSendCounterOfferForApproval}
-                                    disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval || detailsForm.counter_offer.counter_offer_approve_by_md || detailsForm.counter_offer.counter_offer_approve_by_md_at != null || detailsForm.counter_offer.documents.length === 0 || detailsForm.counter_offer.documents.some(d => !d.url || d.uploading)}
+                                    disabled={isTenderCompleted || detailsForm.counter_offer.sent_for_approval || detailsForm.counter_offer.counter_offer_approve_by_md || detailsForm.counter_offer.counter_offer_approve_by_md_at != null || detailsForm.counter_offer.documents.length === 0 || detailsForm.counter_offer.documents.some(d => !d.url || d.uploading) || !detailsForm.counter_offer.counter_offer_deadline}
                                     className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
                                   >
                                     {detailsForm.counter_offer.sent_for_approval ? 'Sent For Approval' : 'Send For Approval'}
@@ -2983,13 +3349,21 @@ export default function TendersListView() {
                               <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full">Enabled</span>
                             </div>
 
-                            {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md_at) && (
+                            {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md_at || selectedTender.counter_offer?.counter_offer_deadline) && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-3 animate-fadeIn">
                                 {selectedTender.counter_offer?.sent_for_approval && (
                                   <div>
                                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Sent for Approval At</span>
                                     <span className="text-xs font-semibold text-slate-700">
                                       {new Date(selectedTender.counter_offer.sent_for_approval_at).toLocaleString()}
+                                    </span>
+                                  </div>
+                                )}
+                                {selectedTender.counter_offer?.counter_offer_deadline && (
+                                  <div>
+                                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Deadline</span>
+                                    <span className="text-xs font-semibold text-slate-700">
+                                      {new Date(selectedTender.counter_offer.counter_offer_deadline).toLocaleString()}
                                     </span>
                                   </div>
                                 )}

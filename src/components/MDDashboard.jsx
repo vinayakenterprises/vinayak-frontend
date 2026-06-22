@@ -13,6 +13,24 @@ const formatDate = (dateString) => {
   }
 };
 
+const formatDeadline = (dateString) => {
+  if (!dateString) return 'N/A';
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return dateString;
+    return d.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch {
+    return dateString;
+  }
+};
+
 export default function MDDashboard() {
   const [pendingTenders, setPendingTenders] = useState([]);
   const [counterOfferTenders, setCounterOfferTenders] = useState([]);
@@ -448,6 +466,9 @@ export default function MDDashboard() {
                   <th className="py-3.5 px-6">Tender ID</th>
                   <th className="py-3.5 px-4">Title &amp; Reference</th>
                   <th className="py-3.5 px-4">Organization</th>
+                  {activeTab === 'Counter Offer Requests' && (
+                    <th className="py-3.5 px-4">Deadline</th>
+                  )}
                   <th className="py-3.5 px-4">Total Order Length</th>
                   <th className="py-3.5 px-4">State</th>
                   <th className="py-3.5 px-4">Closing Date</th>
@@ -461,7 +482,7 @@ export default function MDDashboard() {
                     key={tender.id}
                     className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group"
                   >
-                    <td className="py-4 px-6 text-sm font-semibold text-slate-800 dark:text-slate-350">
+                    <td className="py-4 px-6 text-sm font-semibold text-slate-800 dark:text-slate-355">
                       {tender.tender_id}
                     </td>
                     <td className="py-4 px-4 max-w-xs">
@@ -475,6 +496,11 @@ export default function MDDashboard() {
                     <td className="py-4 px-4 text-sm text-slate-500 dark:text-slate-400">
                       {tender.tender_organization}
                     </td>
+                    {activeTab === 'Counter Offer Requests' && (
+                      <td className="py-4 px-4 text-sm font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                        {formatDeadline(tender.counter_offer?.counter_offer_deadline)}
+                      </td>
+                    )}
                     <td className="py-4 px-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {tender.cable_length_km} KM
                     </td>
@@ -799,13 +825,21 @@ export default function MDDashboard() {
                       <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-full">Enabled</span>
                     </div>
 
-                    {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md_at) && (
+                    {(selectedTender.counter_offer?.sent_for_approval || selectedTender.counter_offer?.counter_offer_approve_by_md_at || selectedTender.counter_offer?.counter_offer_deadline) && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800 pt-3 animate-fadeIn">
                         {selectedTender.counter_offer?.sent_for_approval && (
                           <div>
                             <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Sent for Approval At</span>
                             <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                               {new Date(selectedTender.counter_offer.sent_for_approval_at).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        {selectedTender.counter_offer?.counter_offer_deadline && (
+                          <div>
+                            <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Deadline</span>
+                            <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                              {formatDeadline(selectedTender.counter_offer.counter_offer_deadline)}
                             </span>
                           </div>
                         )}
