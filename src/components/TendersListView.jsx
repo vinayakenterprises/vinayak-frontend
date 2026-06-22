@@ -2606,6 +2606,69 @@ export default function TendersListView() {
                   </div>
                 )}
 
+                {/* Counter Offer Approval From MD Card */}
+                {(selectedTender.counter_offer?.enabled || selectedTender.counter_offer?.counter_offer) && (
+                  <div className="p-4 bg-slate-50/70 border border-slate-150 rounded-xl space-y-3 animate-fadeIn mt-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Counter Offer Approval From MD</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Sent on</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.counter_offer?.sent_for_approval_at ? formatToIST(selectedTender.counter_offer.sent_for_approval_at) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Deadline</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.counter_offer?.counter_offer_deadline ? formatToIST(new Date(selectedTender.counter_offer.counter_offer_deadline)) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Planned</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.counter_offer?.counter_offer_deadline ? (() => {
+                            const d = new Date(selectedTender.counter_offer.counter_offer_deadline);
+                            if (isNaN(d.getTime())) return 'NA';
+                            d.setDate(d.getDate() - 1);
+                            return formatToIST(d);
+                          })() : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.counter_offer?.counter_offer_approve_by_md_at ? formatToIST(selectedTender.counter_offer.counter_offer_approve_by_md_at) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Late</span>
+                        <span className="text-xs font-bold">
+                          {(() => {
+                            if (!selectedTender.counter_offer?.counter_offer_approve_by_md_at || !selectedTender.counter_offer?.counter_offer_deadline) {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                            try {
+                              const deadline = new Date(selectedTender.counter_offer.counter_offer_deadline);
+                              if (isNaN(deadline.getTime())) return <span className="text-slate-400 font-semibold">NA</span>;
+                              const planned = new Date(deadline);
+                              planned.setDate(planned.getDate() - 1);
+                              const actual = new Date(selectedTender.counter_offer.counter_offer_approve_by_md_at);
+                              if (isNaN(actual.getTime())) return <span className="text-slate-400 font-semibold">NA</span>;
+                              if (planned.getTime() >= actual.getTime()) {
+                                return <span className="text-emerald-600 font-bold">On Time</span>;
+                              } else {
+                                return <span className="text-rose-600 font-bold">Late</span>;
+                              }
+                            } catch {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Documents List */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tender Documents</h4>
