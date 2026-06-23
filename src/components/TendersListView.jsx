@@ -2800,6 +2800,56 @@ export default function TendersListView() {
                   </div>
                 )}
 
+                {/* Mark Completion After Acceptance Letter Timeline Tracker Card */}
+                {(activeTab === 'Approved By MD Tenders' || activeTab === 'Submitted Tenders') && (
+                  <div className="p-4 bg-slate-50/70 border border-slate-150 rounded-xl space-y-3 animate-fadeIn mt-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Mark Completion After Acceptance Letter Timeline</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Planned</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.acceptance_letter?.added_at ? (() => {
+                            const d = new Date(selectedTender.acceptance_letter.added_at + (selectedTender.acceptance_letter.added_at.endsWith('Z') ? '' : 'Z'));
+                            d.setDate(d.getDate() + 3);
+                            return formatToIST(d);
+                          })() : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.tender_completed_at ? formatToIST(selectedTender.tender_completed_at) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Late</span>
+                        <span className="text-xs font-bold">
+                          {(() => {
+                            if (!selectedTender.tender_completed_at || !selectedTender.acceptance_letter?.added_at) {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                            try {
+                              const planned = new Date(selectedTender.acceptance_letter.added_at + (selectedTender.acceptance_letter.added_at.endsWith('Z') ? '' : 'Z'));
+                              planned.setDate(planned.getDate() + 3);
+                              const actual = new Date(selectedTender.tender_completed_at);
+                              if (isNaN(planned.getTime()) || isNaN(actual.getTime())) {
+                                return <span className="text-slate-400 font-semibold">NA</span>;
+                              }
+                              if (planned.getTime() >= actual.getTime()) {
+                                return <span className="text-emerald-600 font-bold">On Time</span>;
+                              } else {
+                                return <span className="text-rose-600 font-bold">Late</span>;
+                              }
+                            } catch {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Documents List */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tender Documents</h4>
