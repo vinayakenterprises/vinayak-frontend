@@ -349,7 +349,10 @@ export default function TendersListView() {
     emd_inr: '',
     state: 'Uttar Pradesh',
     status: 'Active',
-    tender_documents: [{ name: 'Spec', url: '', uploading: false, error: '', fileName: '' }]
+    tender_documents: [
+      { name: 'Spec', url: '', uploading: false, error: '', fileName: '' },
+      { name: 'GCC', url: '', uploading: false, error: '', fileName: '' }
+    ]
   };
   const [formData, setFormData] = useState(initialFormState);
 
@@ -1624,6 +1627,21 @@ export default function TendersListView() {
     const closingDate = new Date(formData.closing_date);
     if (publishDate >= closingDate) {
       setSubmitError('Publish date must be earlier than the closing date.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Verify that at least one "Spec" document and one "GCC" document are uploaded
+    const hasSpec = formData.tender_documents.some(d => d.name === 'Spec' && d.url);
+    const hasGCC = formData.tender_documents.some(d => d.name === 'GCC' && d.url);
+    
+    if (!hasSpec) {
+      setSubmitError('The "Spec" document is mandatory. Please add and upload a Spec PDF.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!hasGCC) {
+      setSubmitError('The "GCC" document is mandatory. Please add and upload a GCC PDF.');
       setIsSubmitting(false);
       return;
     }
