@@ -241,7 +241,8 @@ export default function TendersListView() {
     acceptance_letter_added_at: '',
     npv_bond: '',
     npv_bond_fileName: '',
-    npv_bond_added_at: ''
+    npv_bond_added_at: '',
+    immediate_processing_document_completed_at: null
   });
   const [detailsUploadProgress, setDetailsUploadProgress] = useState({});
   const [isSavingDetails, setIsSavingDetails] = useState(false);
@@ -348,7 +349,10 @@ export default function TendersListView() {
     emd_inr: '',
     state: 'Uttar Pradesh',
     status: 'Active',
-    tender_documents: [{ name: 'Spec', url: '', uploading: false, error: '', fileName: '' }]
+    tender_documents: [
+      { name: 'Spec', url: '', uploading: false, error: '', fileName: '' },
+      { name: 'GCC', url: '', uploading: false, error: '', fileName: '' }
+    ]
   };
   const [formData, setFormData] = useState(initialFormState);
 
@@ -647,7 +651,8 @@ export default function TendersListView() {
       npv_bond_fileName: (tender.npv_bond && typeof tender.npv_bond === 'object' && tender.npv_bond.document_url)
         ? tender.npv_bond.document_url.split('/').pop()
         : (typeof tender.npv_bond === 'string' ? tender.npv_bond.split('/').pop() : ''),
-      npv_bond_added_at: (tender.npv_bond && typeof tender.npv_bond === 'object') ? (tender.npv_bond.added_at || '') : ''
+      npv_bond_added_at: (tender.npv_bond && typeof tender.npv_bond === 'object') ? (tender.npv_bond.added_at || '') : '',
+      immediate_processing_document_completed_at: tender.immediate_processing_document_completed_at || null
     });
 
     setIsViewModalOpen(true);
@@ -885,6 +890,15 @@ export default function TendersListView() {
     await handleSaveTenderDetails(false, updatedCounterOffer);
   };
 
+  const handleMarkImmediateProcessingDone = async () => {
+    const timestamp = new Date().toISOString();
+    setDetailsForm(prev => ({
+      ...prev,
+      immediate_processing_document_completed_at: timestamp
+    }));
+    await handleSaveTenderDetails(false, null, timestamp);
+  };
+
   const removeCounterOfferDocRow = (index) => {
     const updatedDocs = detailsForm.counter_offer.documents.filter((_, i) => i !== index);
     setDetailsForm(prev => ({
@@ -988,7 +1002,7 @@ export default function TendersListView() {
   };
 
   // Save/Update Details to backend
-  const handleSaveTenderDetails = async (isMarkComplete = false, counterOfferOverride = null) => {
+  const handleSaveTenderDetails = async (isMarkComplete = false, counterOfferOverride = null, immediateProcessingCompletedAtOverride = null) => {
     setIsSavingDetails(true);
     setDetailsSaveError('');
     setDetailsSaveSuccess('');
@@ -1009,6 +1023,14 @@ export default function TendersListView() {
     const payload = {
       id: selectedTender.id
     };
+
+    const propIPPCompletedAt = immediateProcessingCompletedAtOverride !== null 
+      ? immediateProcessingCompletedAtOverride 
+      : detailsForm.immediate_processing_document_completed_at;
+    const origIPPCompletedAt = selectedTender.immediate_processing_document_completed_at || null;
+    if (origIPPCompletedAt !== propIPPCompletedAt) {
+      payload.immediate_processing_document_completed_at = propIPPCompletedAt;
+    }
 
     // 1. shortfall check
     const origShortfall = !!selectedTender.shortfall;
@@ -1231,6 +1253,7 @@ export default function TendersListView() {
               ...(payload.hasOwnProperty('insurance') ? { insurance: payload.insurance } : {}),
               ...(payload.hasOwnProperty('acceptance_letter') ? { acceptance_letter: payload.acceptance_letter } : {}),
               ...(payload.hasOwnProperty('npv_bond') ? { npv_bond: payload.npv_bond } : {}),
+              ...(payload.hasOwnProperty('immediate_processing_document_completed_at') ? { immediate_processing_document_completed_at: payload.immediate_processing_document_completed_at } : {}),
               tender_completed_at: isMarkComplete ? completedAt : prev.tender_completed_at
             };
           });
@@ -1255,11 +1278,14 @@ export default function TendersListView() {
 
   const isTenderCompleted = selectedTender?.tender_completed_at != null;
 
-  const renderSingleFileUploadDetails = (field, label, accept = ".pdf") => {
+  const renderSingleFileUploadDetails = (field, label, accept = ".pdf", note = null) => {
     const fileUrl = detailsForm[field];
     const fileName = detailsForm[`${field}_fileName`];
     const progress = detailsUploadProgress[field] || {};
-    const isCompleted = isTenderCompleted;
+    const isCompleted = isTenderCompleted || (
+      ['contract_agreement', 'warranty', 'pbg', 'insurance'].includes(field) &&
+      detailsForm.immediate_processing_document_completed_at != null
+    );
 
     return (
       <div className="space-y-1.5">
@@ -1340,6 +1366,14 @@ export default function TendersListView() {
         </div>
         {progress.error && (
           <p className="text-[10px] text-rose-500 font-semibold mt-0.5">{progress.error}</p>
+        )}
+        {note && (
+          <p className="text-[10px] text-slate-500 italic mt-1 flex items-center gap-1 animate-fadeIn">
+            <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {note}
+          </p>
         )}
       </div>
     );
@@ -1593,6 +1627,21 @@ export default function TendersListView() {
     const closingDate = new Date(formData.closing_date);
     if (publishDate >= closingDate) {
       setSubmitError('Publish date must be earlier than the closing date.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Verify that at least one "Spec" document and one "GCC" document are uploaded
+    const hasSpec = formData.tender_documents.some(d => d.name === 'Spec' && d.url);
+    const hasGCC = formData.tender_documents.some(d => d.name === 'GCC' && d.url);
+    
+    if (!hasSpec) {
+      setSubmitError('The "Spec" document is mandatory. Please add and upload a Spec PDF.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!hasGCC) {
+      setSubmitError('The "GCC" document is mandatory. Please add and upload a GCC PDF.');
       setIsSubmitting(false);
       return;
     }
@@ -2669,6 +2718,156 @@ export default function TendersListView() {
                   </div>
                 )}
 
+                {/* Immediate Processing Documents Tracker Card */}
+                {(activeTab === 'Approved By MD Tenders' || activeTab === 'Submitted Tenders') && (
+                  <div className="p-4 bg-slate-50/70 border border-slate-150 rounded-xl space-y-3 animate-fadeIn mt-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Immediate Processing Documents</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Planned</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.po?.added_at ? (() => {
+                            const d = new Date(selectedTender.po.added_at + (selectedTender.po.added_at.endsWith('Z') ? '' : 'Z'));
+                            d.setDate(d.getDate() + 5);
+                            return formatToIST(d);
+                          })() : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.immediate_processing_document_completed_at ? formatToIST(selectedTender.immediate_processing_document_completed_at) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Late</span>
+                        <span className="text-xs font-bold">
+                          {(() => {
+                            if (!selectedTender.immediate_processing_document_completed_at || !selectedTender.po?.added_at) {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                            try {
+                              const planned = new Date(selectedTender.po.added_at + (selectedTender.po.added_at.endsWith('Z') ? '' : 'Z'));
+                              planned.setDate(planned.getDate() + 5);
+                              const actual = new Date(selectedTender.immediate_processing_document_completed_at);
+                              if (isNaN(planned.getTime()) || isNaN(actual.getTime())) {
+                                return <span className="text-slate-400 font-semibold">NA</span>;
+                              }
+                              if (planned.getTime() >= actual.getTime()) {
+                                return <span className="text-emerald-600 font-bold">On Time</span>;
+                              } else {
+                                return <span className="text-rose-600 font-bold">Late</span>;
+                              }
+                            } catch {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Acceptance Letter After Document Processing Tracker Card */}
+                {(activeTab === 'Approved By MD Tenders' || activeTab === 'Submitted Tenders') && (
+                  <div className="p-4 bg-slate-50/70 border border-slate-150 rounded-xl space-y-3 animate-fadeIn mt-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Acceptance Letter After Document Processing</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Planned</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.immediate_processing_document_completed_at ? (() => {
+                            const d = new Date(selectedTender.immediate_processing_document_completed_at);
+                            d.setDate(d.getDate() + 5);
+                            return formatToIST(d);
+                          })() : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.acceptance_letter?.added_at ? formatToIST(selectedTender.acceptance_letter.added_at) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Late</span>
+                        <span className="text-xs font-bold">
+                          {(() => {
+                            if (!selectedTender.acceptance_letter?.added_at || !selectedTender.immediate_processing_document_completed_at) {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                            try {
+                              const planned = new Date(selectedTender.immediate_processing_document_completed_at);
+                              planned.setDate(planned.getDate() + 5);
+                              const actual = new Date(selectedTender.acceptance_letter.added_at);
+                              if (isNaN(planned.getTime()) || isNaN(actual.getTime())) {
+                                return <span className="text-slate-400 font-semibold">NA</span>;
+                              }
+                              if (planned.getTime() >= actual.getTime()) {
+                                return <span className="text-emerald-600 font-bold">On Time</span>;
+                              } else {
+                                return <span className="text-rose-600 font-bold">Late</span>;
+                              }
+                            } catch {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mark Completion After Acceptance Letter Timeline Tracker Card */}
+                {(activeTab === 'Approved By MD Tenders' || activeTab === 'Submitted Tenders') && (
+                  <div className="p-4 bg-slate-50/70 border border-slate-150 rounded-xl space-y-3 animate-fadeIn mt-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Mark Completion After Acceptance Letter Timeline</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Planned</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.acceptance_letter?.added_at ? (() => {
+                            const d = new Date(selectedTender.acceptance_letter.added_at + (selectedTender.acceptance_letter.added_at.endsWith('Z') ? '' : 'Z'));
+                            d.setDate(d.getDate() + 3);
+                            return formatToIST(d);
+                          })() : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.tender_completed_at ? formatToIST(selectedTender.tender_completed_at) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Late</span>
+                        <span className="text-xs font-bold">
+                          {(() => {
+                            if (!selectedTender.tender_completed_at || !selectedTender.acceptance_letter?.added_at) {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                            try {
+                              const planned = new Date(selectedTender.acceptance_letter.added_at + (selectedTender.acceptance_letter.added_at.endsWith('Z') ? '' : 'Z'));
+                              planned.setDate(planned.getDate() + 3);
+                              const actual = new Date(selectedTender.tender_completed_at);
+                              if (isNaN(planned.getTime()) || isNaN(actual.getTime())) {
+                                return <span className="text-slate-400 font-semibold">NA</span>;
+                              }
+                              if (planned.getTime() >= actual.getTime()) {
+                                return <span className="text-emerald-600 font-bold">On Time</span>;
+                              } else {
+                                return <span className="text-rose-600 font-bold">Late</span>;
+                              }
+                            } catch {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Documents List */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tender Documents</h4>
@@ -3169,14 +3368,34 @@ export default function TendersListView() {
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {renderSingleFileUploadDetails('loi', 'LOI (Letter of Intent)', '.pdf')}
-                            {renderSingleFileUploadDetails('po', 'PO (Purchase Order)', '.pdf')}
+                            {renderSingleFileUploadDetails('po', 'PO (Purchase Order)', '.pdf', 'PO should be uploaded within 30 days of counter offer acceptance')}
                           </div>
                         </div>
 
                         {/* Immediate Processing Documents (PDF) */}
                         <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-4">
                           <div className="flex flex-col gap-2">
-                            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Immediate Processing Documents (PDF)</h4>
+                            <div className="flex items-center justify-between gap-4">
+                              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Immediate Processing Documents (PDF)</h4>
+                              {detailsForm.immediate_processing_document_completed_at ? (
+                                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 border border-emerald-100 rounded-full flex items-center gap-1 animate-fadeIn">
+                                  <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
+                                  </svg>
+                                  Done At: {formatToIST(detailsForm.immediate_processing_document_completed_at)}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleMarkImmediateProcessingDone}
+                                  disabled={isTenderCompleted}
+                                  className="px-3 py-1 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer shadow-xs"
+                                  title="Mark these documents as completed"
+                                >
+                                  Mark As Done
+                                </button>
+                              )}
+                            </div>
                             <div className="p-3 bg-amber-50 text-amber-800 border border-amber-100 rounded-lg text-xs font-bold flex items-center gap-2 animate-fadeIn">
                               <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
