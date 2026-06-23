@@ -33,6 +33,33 @@ const formatDeadline = (dateString) => {
     return dateString;
   }
 };
+const getStatusDisplay = (tender) => {
+  if (!tender) return { label: 'N/A', color: 'slate', footerLabel: 'N/A' };
+
+  const co = tender.counter_offer;
+  const hasCounterOffer = co?.enabled || co?.counter_offer;
+
+  // 1. Check Counter Offer approval status first if it was sent for approval
+  if (hasCounterOffer && co?.sent_for_approval) {
+    if (co.counter_offer_approve_by_md === true) {
+      return { label: 'Counter Offer Approved', color: 'emerald', footerLabel: 'Counter Offer Approved' };
+    }
+    if (co.counter_offer_approve_by_md === false) {
+      return { label: 'Counter Offer Rejected', color: 'rose', footerLabel: 'Counter Offer Rejected' };
+    }
+    return { label: 'Counter Offer Pending', color: 'amber', footerLabel: 'Counter Offer Pending' };
+  }
+
+  // 2. Check main tender approval status
+  if (tender.approved === true) {
+    return { label: 'Approved', color: 'emerald', footerLabel: 'Already Approved' };
+  }
+  if (tender.approved === false) {
+    return { label: 'Rejected', color: 'rose', footerLabel: 'Rejected' };
+  }
+  return { label: 'Pending Approval', color: 'amber', footerLabel: 'Pending Approval' };
+};
+
 export default function MDDashboard() {
   const [pendingTenders, setPendingTenders] = useState([]);
 
@@ -641,22 +668,22 @@ export default function MDDashboard() {
                     <h3 className="text-lg font-bold text-slate-950 dark:text-white">{selectedTender.tender_title}</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase mt-0.5">{selectedTender.tender_organization}</p>
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${(activeTab === 'Approved Tenders' || activeTab === 'Counter Offer Approved')
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900'
-                    : (activeTab === 'Rejected Tenders' || activeTab === 'Counter Offer Rejected')
-                      ? 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900'
-                      : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900'
-                    }`}>
-                    {activeTab === 'Approved Tenders'
-                      ? 'Approved'
-                      : activeTab === 'Counter Offer Approved'
-                        ? 'Counter Offer Approved'
-                        : activeTab === 'Rejected Tenders'
-                          ? 'Rejected'
-                          : activeTab === 'Counter Offer Rejected'
-                            ? 'Counter Offer Rejected'
-                            : 'Pending Approval'}
-                  </span>
+                  {(() => {
+                    const disp = getStatusDisplay(selectedTender);
+                    const isEmerald = disp.color === 'emerald';
+                    const isRose = disp.color === 'rose';
+                    return (
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                        isEmerald
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900'
+                          : isRose
+                            ? 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900'
+                            : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-955/30 dark:text-amber-400 dark:border-amber-900'
+                      }`}>
+                        {disp.label}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="grid grid-cols-2 gap-y-4 gap-x-2 border-t border-b border-slate-100 dark:border-slate-800 py-4">
@@ -1198,20 +1225,41 @@ export default function MDDashboard() {
                     )}
                   </button>
                 </div>
-              ) : (activeTab === 'Approved Tenders' || activeTab === 'Counter Offer Approved') ? (
-                <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold">
-                  <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {activeTab === 'Approved Tenders' ? 'Already Approved' : 'Counter Offer Approved'}
-                </div>
               ) : (
-                <div className="flex items-center gap-1 text-rose-600 text-xs font-bold">
-                  <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {activeTab === 'Rejected Tenders' ? 'Rejected' : 'Counter Offer Rejected'}
-                </div>
+                (() => {
+                  const disp = getStatusDisplay(selectedTender);
+                  const isEmerald = disp.color === 'emerald';
+                  const isRose = disp.color === 'rose';
+                  
+                  if (isEmerald) {
+                    return (
+                      <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold">
+                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {disp.footerLabel}
+                      </div>
+                    );
+                  } else if (isRose) {
+                    return (
+                      <div className="flex items-center gap-1 text-rose-600 text-xs font-bold">
+                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {disp.footerLabel}
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="flex items-center gap-1 text-amber-600 text-xs font-bold">
+                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {disp.footerLabel}
+                      </div>
+                    );
+                  }
+                })()
               )}
               <button
                 onClick={() => setSelectedTender(null)}
