@@ -2750,6 +2750,56 @@ export default function TendersListView() {
                   </div>
                 )}
 
+                {/* Acceptance Letter After Document Processing Tracker Card */}
+                {(activeTab === 'Approved By MD Tenders' || activeTab === 'Submitted Tenders') && (
+                  <div className="p-4 bg-slate-50/70 border border-slate-150 rounded-xl space-y-3 animate-fadeIn mt-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Acceptance Letter After Document Processing</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Planned</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.immediate_processing_document_completed_at ? (() => {
+                            const d = new Date(selectedTender.immediate_processing_document_completed_at);
+                            d.setDate(d.getDate() + 5);
+                            return formatToIST(d);
+                          })() : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {selectedTender.acceptance_letter?.added_at ? formatToIST(selectedTender.acceptance_letter.added_at) : 'NA'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Late</span>
+                        <span className="text-xs font-bold">
+                          {(() => {
+                            if (!selectedTender.acceptance_letter?.added_at || !selectedTender.immediate_processing_document_completed_at) {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                            try {
+                              const planned = new Date(selectedTender.immediate_processing_document_completed_at);
+                              planned.setDate(planned.getDate() + 5);
+                              const actual = new Date(selectedTender.acceptance_letter.added_at);
+                              if (isNaN(planned.getTime()) || isNaN(actual.getTime())) {
+                                return <span className="text-slate-400 font-semibold">NA</span>;
+                              }
+                              if (planned.getTime() >= actual.getTime()) {
+                                return <span className="text-emerald-600 font-bold">On Time</span>;
+                              } else {
+                                return <span className="text-rose-600 font-bold">Late</span>;
+                              }
+                            } catch {
+                              return <span className="text-slate-400 font-semibold">NA</span>;
+                            }
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Documents List */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tender Documents</h4>
