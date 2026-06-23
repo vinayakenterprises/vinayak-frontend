@@ -241,7 +241,8 @@ export default function TendersListView() {
     acceptance_letter_added_at: '',
     npv_bond: '',
     npv_bond_fileName: '',
-    npv_bond_added_at: ''
+    npv_bond_added_at: '',
+    immediate_processing_document_completed_at: null
   });
   const [detailsUploadProgress, setDetailsUploadProgress] = useState({});
   const [isSavingDetails, setIsSavingDetails] = useState(false);
@@ -647,7 +648,8 @@ export default function TendersListView() {
       npv_bond_fileName: (tender.npv_bond && typeof tender.npv_bond === 'object' && tender.npv_bond.document_url)
         ? tender.npv_bond.document_url.split('/').pop()
         : (typeof tender.npv_bond === 'string' ? tender.npv_bond.split('/').pop() : ''),
-      npv_bond_added_at: (tender.npv_bond && typeof tender.npv_bond === 'object') ? (tender.npv_bond.added_at || '') : ''
+      npv_bond_added_at: (tender.npv_bond && typeof tender.npv_bond === 'object') ? (tender.npv_bond.added_at || '') : '',
+      immediate_processing_document_completed_at: tender.immediate_processing_document_completed_at || null
     });
 
     setIsViewModalOpen(true);
@@ -885,6 +887,15 @@ export default function TendersListView() {
     await handleSaveTenderDetails(false, updatedCounterOffer);
   };
 
+  const handleMarkImmediateProcessingDone = async () => {
+    const timestamp = new Date().toISOString();
+    setDetailsForm(prev => ({
+      ...prev,
+      immediate_processing_document_completed_at: timestamp
+    }));
+    await handleSaveTenderDetails(false, null, timestamp);
+  };
+
   const removeCounterOfferDocRow = (index) => {
     const updatedDocs = detailsForm.counter_offer.documents.filter((_, i) => i !== index);
     setDetailsForm(prev => ({
@@ -988,7 +999,7 @@ export default function TendersListView() {
   };
 
   // Save/Update Details to backend
-  const handleSaveTenderDetails = async (isMarkComplete = false, counterOfferOverride = null) => {
+  const handleSaveTenderDetails = async (isMarkComplete = false, counterOfferOverride = null, immediateProcessingCompletedAtOverride = null) => {
     setIsSavingDetails(true);
     setDetailsSaveError('');
     setDetailsSaveSuccess('');
@@ -1009,6 +1020,14 @@ export default function TendersListView() {
     const payload = {
       id: selectedTender.id
     };
+
+    const propIPPCompletedAt = immediateProcessingCompletedAtOverride !== null 
+      ? immediateProcessingCompletedAtOverride 
+      : detailsForm.immediate_processing_document_completed_at;
+    const origIPPCompletedAt = selectedTender.immediate_processing_document_completed_at || null;
+    if (origIPPCompletedAt !== propIPPCompletedAt) {
+      payload.immediate_processing_document_completed_at = propIPPCompletedAt;
+    }
 
     // 1. shortfall check
     const origShortfall = !!selectedTender.shortfall;
@@ -1231,6 +1250,7 @@ export default function TendersListView() {
               ...(payload.hasOwnProperty('insurance') ? { insurance: payload.insurance } : {}),
               ...(payload.hasOwnProperty('acceptance_letter') ? { acceptance_letter: payload.acceptance_letter } : {}),
               ...(payload.hasOwnProperty('npv_bond') ? { npv_bond: payload.npv_bond } : {}),
+              ...(payload.hasOwnProperty('immediate_processing_document_completed_at') ? { immediate_processing_document_completed_at: payload.immediate_processing_document_completed_at } : {}),
               tender_completed_at: isMarkComplete ? completedAt : prev.tender_completed_at
             };
           });
@@ -1259,7 +1279,10 @@ export default function TendersListView() {
     const fileUrl = detailsForm[field];
     const fileName = detailsForm[`${field}_fileName`];
     const progress = detailsUploadProgress[field] || {};
-    const isCompleted = isTenderCompleted;
+    const isCompleted = isTenderCompleted || (
+      ['contract_agreement', 'warranty', 'pbg', 'insurance'].includes(field) &&
+      detailsForm.immediate_processing_document_completed_at != null
+    );
 
     return (
       <div className="space-y-1.5">
@@ -3184,7 +3207,27 @@ export default function TendersListView() {
                         {/* Immediate Processing Documents (PDF) */}
                         <div className="p-4 bg-slate-50/70 border border-slate-100 rounded-xl space-y-4">
                           <div className="flex flex-col gap-2">
-                            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Immediate Processing Documents (PDF)</h4>
+                            <div className="flex items-center justify-between gap-4">
+                              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Immediate Processing Documents (PDF)</h4>
+                              {detailsForm.immediate_processing_document_completed_at ? (
+                                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 border border-emerald-100 rounded-full flex items-center gap-1 animate-fadeIn">
+                                  <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
+                                  </svg>
+                                  Done At: {formatToIST(detailsForm.immediate_processing_document_completed_at)}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleMarkImmediateProcessingDone}
+                                  disabled={isTenderCompleted}
+                                  className="px-3 py-1 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer shadow-xs"
+                                  title="Mark these documents as completed"
+                                >
+                                  Mark As Done
+                                </button>
+                              )}
+                            </div>
                             <div className="p-3 bg-amber-50 text-amber-800 border border-amber-100 rounded-lg text-xs font-bold flex items-center gap-2 animate-fadeIn">
                               <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
