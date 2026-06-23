@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
+import { formatToIST, calculateTenderSLAs } from '../utils/helper-functions';
+import MDTimelineTable from './MDTimelineTable';
+
 
 const formatDate = (dateString) => {
   if (!dateString) return '';
@@ -30,15 +33,17 @@ const formatDeadline = (dateString) => {
     return dateString;
   }
 };
-
 export default function MDDashboard() {
   const [pendingTenders, setPendingTenders] = useState([]);
+
   const [counterOfferTenders, setCounterOfferTenders] = useState([]);
   const [approvedTenders, setApprovedTenders] = useState([]);
   const [rejectedTenders, setRejectedTenders] = useState([]);
   const [counterOfferApprovedTenders, setCounterOfferApprovedTenders] = useState([]);
   const [counterOfferRejectedTenders, setCounterOfferRejectedTenders] = useState([]);
+  const [timelineTenders, setTimelineTenders] = useState([]);
   const [activeTab, setActiveTab] = useState('Approval Requests');
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [cardData, setCardData] = useState({
@@ -71,7 +76,8 @@ export default function MDDashboard() {
         cardsRes,
         rejectedRes,
         counterOfferApprovedRes,
-        counterOfferRejectedRes
+        counterOfferRejectedRes,
+        timelineRes
       ] = await Promise.all([
         fetch(`${API_BASE_URL}/api/v1/tenders/approval-request-tenders`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -93,6 +99,9 @@ export default function MDDashboard() {
         }),
         fetch(`${API_BASE_URL}/api/v1/tenders/get-counter-offer-rejected-tenders`, {
           headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE_URL}/api/v1/tenders/get-tenders-for-md`, {
+          headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
 
@@ -103,6 +112,7 @@ export default function MDDashboard() {
       const rejectedData = await rejectedRes.json().catch(() => null);
       const counterOfferApprovedData = await counterOfferApprovedRes.json().catch(() => null);
       const counterOfferRejectedData = await counterOfferRejectedRes.json().catch(() => null);
+      const timelineData = await timelineRes.json().catch(() => null);
 
       if (pendingRes.ok && pendingData?.status === 'success') {
         setPendingTenders(pendingData.data || []);
@@ -138,6 +148,12 @@ export default function MDDashboard() {
         setCounterOfferRejectedTenders(counterOfferRejectedData.data || []);
       } else {
         setError(prev => prev || counterOfferRejectedData?.message || 'Failed to load counter offer rejected tenders.');
+      }
+
+      if (timelineRes.ok && timelineData?.status === 'success') {
+        setTimelineTenders(timelineData.data || []);
+      } else {
+        setError(prev => prev || timelineData?.message || 'Failed to load timeline tenders.');
       }
 
       if (cardsRes.ok && cardsData?.status === 'success') {
@@ -268,7 +284,10 @@ export default function MDDashboard() {
             ? counterOfferTenders
             : activeTab === 'Counter Offer Approved'
               ? counterOfferApprovedTenders
-              : counterOfferRejectedTenders; // 'Counter Offer Rejected'
+              : activeTab === 'Time Line'
+                ? timelineTenders
+                : counterOfferRejectedTenders; // 'Counter Offer Rejected'
+
 
   return (
     <div className="space-y-6">
@@ -389,7 +408,7 @@ export default function MDDashboard() {
         {/* Tab Header */}
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
           <div className="flex gap-2">
-            {['Approval Requests', 'Approved Tenders', 'Rejected Tenders', 'Counter Offer Requests', 'Counter Offer Approved', 'Counter Offer Rejected'].map((tab) => (
+            {['Approval Requests', 'Approved Tenders', 'Rejected Tenders', 'Counter Offer Requests', 'Counter Offer Approved', 'Counter Offer Rejected', 'Time Line'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -404,6 +423,7 @@ export default function MDDashboard() {
                 {tab}
               </button>
             ))}
+
           </div>
           <button
             onClick={loadDashboardData}
@@ -459,6 +479,8 @@ export default function MDDashboard() {
                 </p>
               </div>
             </div>
+          ) : activeTab === 'Time Line' ? (
+            <MDTimelineTable tenders={activeTenders} onViewClick={openViewModal} />
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
@@ -471,6 +493,7 @@ export default function MDDashboard() {
                   )}
                   <th className="py-3.5 px-4">Total Order Length</th>
                   <th className="py-3.5 px-4">State</th>
+
                   <th className="py-3.5 px-4">Closing Date</th>
                   <th className="py-3.5 px-4">Value</th>
                   <th className="py-3.5 px-6 text-right">Actions</th>
@@ -504,9 +527,10 @@ export default function MDDashboard() {
                     <td className="py-4 px-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {tender.cable_length_km} KM
                     </td>
-                    <td className="py-4 px-4 text-sm text-slate-500 dark:text-slate-400">
+                    <td className="py-4 px-4 text-sm">
                       {tender.state}
                     </td>
+
                     <td className="py-4 px-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {formatDate(tender.closing_date)}
                     </td>
@@ -935,8 +959,173 @@ export default function MDDashboard() {
                     </div>
                   </div>
                 ) : null}
-              </div>
+
+                {/* Timeline Trackers & SLAs */}
+                {(() => {
+                  const slas = calculateTenderSLAs(selectedTender);
+                  return (
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-150 dark:border-slate-800 rounded-xl space-y-4 animate-fadeIn">
+                      <h4 className="text-xs font-bold text-slate-700 dark:text-slate-355 uppercase tracking-wide">Timeline Trackers &amp; SLAs</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        
+                        {/* 1. Sent for Approval Card */}
+                        <div className="p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg space-y-1.5">
+                          <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Sent for Approval</span>
+                          <div className="text-[11px] space-y-0.5 text-slate-650 dark:text-slate-355">
+                            <div>
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Planned:</span>
+                              {slas.approval.planned ? formatToIST(slas.approval.planned) : 'NA'}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Actual:</span>
+                              {slas.approval.actual ? formatToIST(slas.approval.actual) : 'NA'}
+                            </div>
+                            <div className="pt-1">
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Late:</span>
+                              {slas.approval.status === 'NA' ? (
+                                <span className="text-slate-400 font-semibold">NA</span>
+                              ) : slas.approval.status === 'OnTime' ? (
+                                <span className="text-emerald-600 font-bold">{slas.approval.label}</span>
+                              ) : (
+                                <span className={slas.approval.status === 'Late' ? "text-rose-600 font-bold" : "text-amber-600 font-bold"}>{slas.approval.label}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Upload Submission Slip Card */}
+                        <div className="p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg space-y-1.5">
+                          <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Upload Submission Slip</span>
+                          <div className="text-[11px] space-y-0.5 text-slate-650 dark:text-slate-355">
+                            <div>
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Planned:</span>
+                              {slas.submissionSlip.planned ? formatToIST(slas.submissionSlip.planned) : 'NA'}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Actual:</span>
+                              {slas.submissionSlip.actual ? formatToIST(slas.submissionSlip.actual) : 'NA'}
+                            </div>
+                            <div className="pt-1">
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Late:</span>
+                              {slas.submissionSlip.status === 'NA' ? (
+                                <span className="text-slate-400 font-semibold">NA</span>
+                              ) : slas.submissionSlip.status === 'OnTime' ? (
+                                <span className="text-emerald-600 font-bold">{slas.submissionSlip.label}</span>
+                              ) : (
+                                <span className={slas.submissionSlip.status === 'Late' ? "text-rose-600 font-bold" : "text-amber-600 font-bold"}>{slas.submissionSlip.label}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. MD CO Approval Card */}
+                        {(selectedTender.counter_offer?.enabled || selectedTender.counter_offer?.counter_offer) && (
+                          <div className="p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg space-y-1.5">
+                            <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Counter Offer MD Approval</span>
+                            <div className="text-[11px] space-y-0.5 text-slate-650 dark:text-slate-355">
+                              <div>
+                                <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Planned:</span>
+                                {slas.mdCoApproval.planned ? formatToIST(slas.mdCoApproval.planned) : 'NA'}
+                              </div>
+                              <div>
+                                <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Actual:</span>
+                                {slas.mdCoApproval.actual ? formatToIST(slas.mdCoApproval.actual) : 'NA'}
+                              </div>
+                              <div className="pt-1">
+                                <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Late:</span>
+                                {slas.mdCoApproval.status === 'NA' ? (
+                                  <span className="text-slate-400 font-semibold">NA</span>
+                                ) : slas.mdCoApproval.status === 'OnTime' ? (
+                                  <span className="text-emerald-600 font-bold">{slas.mdCoApproval.label}</span>
+                                ) : (
+                                  <span className={slas.mdCoApproval.status === 'Late' ? "text-rose-600 font-bold" : "text-amber-600 font-bold"}>{slas.mdCoApproval.label}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 4. Immediate Processing Documents Card */}
+                        <div className="p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg space-y-1.5">
+                          <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Immediate Processing Documents</span>
+                          <div className="text-[11px] space-y-0.5 text-slate-650 dark:text-slate-355">
+                            <div>
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Planned:</span>
+                              {slas.immediateDocs.planned ? formatToIST(slas.immediateDocs.planned) : 'NA'}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Actual:</span>
+                              {slas.immediateDocs.actual ? formatToIST(slas.immediateDocs.actual) : 'NA'}
+                            </div>
+                            <div className="pt-1">
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Late:</span>
+                              {slas.immediateDocs.status === 'NA' ? (
+                                <span className="text-slate-400 font-semibold">NA</span>
+                              ) : slas.immediateDocs.status === 'OnTime' ? (
+                                <span className="text-emerald-600 font-bold">{slas.immediateDocs.label}</span>
+                              ) : (
+                                <span className={slas.immediateDocs.status === 'Late' ? "text-rose-600 font-bold" : "text-amber-600 font-bold"}>{slas.immediateDocs.label}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 5. Acceptance Letter After Document Processing Card */}
+                        <div className="p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg space-y-1.5">
+                          <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Acceptance Letter After Document Processing</span>
+                          <div className="text-[11px] space-y-0.5 text-slate-650 dark:text-slate-355">
+                            <div>
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Planned:</span>
+                              {slas.acceptanceLetter.planned ? formatToIST(slas.acceptanceLetter.planned) : 'NA'}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Actual:</span>
+                              {slas.acceptanceLetter.actual ? formatToIST(slas.acceptanceLetter.actual) : 'NA'}
+                            </div>
+                            <div className="pt-1">
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Late:</span>
+                              {slas.acceptanceLetter.status === 'NA' ? (
+                                <span className="text-slate-400 font-semibold">NA</span>
+                              ) : slas.acceptanceLetter.status === 'OnTime' ? (
+                                <span className="text-emerald-600 font-bold">{slas.acceptanceLetter.label}</span>
+                              ) : (
+                                <span className={slas.acceptanceLetter.status === 'Late' ? "text-rose-600 font-bold" : "text-amber-600 font-bold"}>{slas.acceptanceLetter.label}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 6. Mark Completion After Acceptance Letter Timeline Card */}
+                        <div className="p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg space-y-1.5">
+                          <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Mark Completion After Acceptance Letter</span>
+                          <div className="text-[11px] space-y-0.5 text-slate-650 dark:text-slate-355">
+                            <div>
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Planned:</span>
+                              {slas.completion.planned ? formatToIST(slas.completion.planned) : 'NA'}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Actual:</span>
+                              {slas.completion.actual ? formatToIST(slas.completion.actual) : 'NA'}
+                            </div>
+                            <div className="pt-1">
+                              <span className="font-semibold text-slate-400 uppercase text-[9px] mr-1">Late:</span>
+                              {slas.completion.status === 'NA' ? (
+                                <span className="text-slate-400 font-semibold">NA</span>
+                              ) : slas.completion.status === 'OnTime' ? (
+                                <span className="text-emerald-600 font-bold">{slas.completion.label}</span>
+                              ) : (
+                                <span className={slas.completion.status === 'Late' ? "text-rose-600 font-bold" : "text-amber-600 font-bold"}>{slas.completion.label}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  );
+                })()}
             </div>
+          </div>
             {/* Modal Footer */}
             <div className="border-t border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
               {activeTab === 'Approval Requests' ? (
