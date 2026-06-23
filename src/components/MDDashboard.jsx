@@ -77,7 +77,6 @@ export default function MDDashboard() {
     totalTenders: 0,
     totalActiveTenders: 0,
     totalApprovedTenders: 0,
-    pendingFromAccountsTeam: 0,
     completedTenders: 0,
     rejectedTenders: 0
   });
@@ -188,7 +187,6 @@ export default function MDDashboard() {
           totalTenders: 0,
           totalActiveTenders: 0,
           totalApprovedTenders: 0,
-          pendingFromAccountsTeam: 0,
           completedTenders: 0,
           rejectedTenders: 0
         });
@@ -337,8 +335,7 @@ export default function MDDashboard() {
         </div>
       )}
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-2 mr-2 ml-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-2 mr-2 ml-2">
         {/* Total Tenders Card */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 rounded-xl flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
           <div className="space-y-0.5">
@@ -380,21 +377,6 @@ export default function MDDashboard() {
           <div className="w-9 h-9 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 rounded-lg flex items-center justify-center shrink-0">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Pending From Accounts Tenders Card */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 p-4 rounded-xl flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pending From Accounts Tenders</span>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              {isLoading ? '...' : cardData.pendingFromAccountsTeam}
-            </h3>
-          </div>
-          <div className="w-9 h-9 bg-amber-50 dark:bg-amber-950/30 text-amber-500 rounded-lg flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
         </div>
@@ -673,13 +655,12 @@ export default function MDDashboard() {
                     const isEmerald = disp.color === 'emerald';
                     const isRose = disp.color === 'rose';
                     return (
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                        isEmerald
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${isEmerald
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900'
                           : isRose
                             ? 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900'
                             : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-955/30 dark:text-amber-400 dark:border-amber-900'
-                      }`}>
+                        }`}>
                         {disp.label}
                       </span>
                     );
@@ -994,7 +975,7 @@ export default function MDDashboard() {
                     <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-150 dark:border-slate-800 rounded-xl space-y-4 animate-fadeIn">
                       <h4 className="text-xs font-bold text-slate-700 dark:text-slate-355 uppercase tracking-wide">Timeline Trackers &amp; SLAs</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        
+
                         {/* 1. Sent for Approval Card */}
                         <div className="p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-lg space-y-1.5">
                           <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Sent for Approval</span>
@@ -1151,8 +1132,8 @@ export default function MDDashboard() {
                     </div>
                   );
                 })()}
+              </div>
             </div>
-          </div>
             {/* Modal Footer */}
             <div className="border-t border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
               {activeTab === 'Approval Requests' ? (
@@ -1230,7 +1211,7 @@ export default function MDDashboard() {
                   const disp = getStatusDisplay(selectedTender);
                   const isEmerald = disp.color === 'emerald';
                   const isRose = disp.color === 'rose';
-                  
+
                   if (isEmerald) {
                     return (
                       <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold">
