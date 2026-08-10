@@ -21,7 +21,7 @@ const INDIAN_STATES = [
   "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
-const DOCUMENT_NAMES = ["Spec", "GCC", "IIB", "Notice", "BOQ"];
+const DOCUMENT_NAMES = ["Spec", "GCC", "ITB", "Notice", "BOQ"];
 
 const PRODUCT_NAMES = ["AB Cable", "ACSR", "AAA"];
 
@@ -1024,8 +1024,8 @@ export default function TendersListView() {
       id: selectedTender.id
     };
 
-    const propIPPCompletedAt = immediateProcessingCompletedAtOverride !== null 
-      ? immediateProcessingCompletedAtOverride 
+    const propIPPCompletedAt = immediateProcessingCompletedAtOverride !== null
+      ? immediateProcessingCompletedAtOverride
       : detailsForm.immediate_processing_document_completed_at;
     const origIPPCompletedAt = selectedTender.immediate_processing_document_completed_at || null;
     if (origIPPCompletedAt !== propIPPCompletedAt) {
@@ -1634,7 +1634,7 @@ export default function TendersListView() {
     // Verify that at least one "Spec" document and one "GCC" document are uploaded
     const hasSpec = formData.tender_documents.some(d => d.name === 'Spec' && d.url);
     const hasGCC = formData.tender_documents.some(d => d.name === 'GCC' && d.url);
-    
+
     if (!hasSpec) {
       setSubmitError('The "Spec" document is mandatory. Please add and upload a Spec PDF.');
       setIsSubmitting(false);
