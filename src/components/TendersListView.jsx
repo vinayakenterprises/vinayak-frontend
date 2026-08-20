@@ -458,16 +458,28 @@ export default function TendersListView() {
   const openEditModal = (tender) => {
     setFormData({
       ...tender,
-      cable_length_km: tender.cable_length_km.toString(),
-      tender_value_cr: tender.tender_value_cr.toString(),
-      tender_fee_inr: tender.tender_fee_inr.toString(),
-      emd_inr: tender.emd_inr.toString(),
+      publish_date: formatDate(tender.publish_date),
+      closing_date: formatDate(tender.closing_date),
+      cable_length_km: tender.cable_length_km ? tender.cable_length_km.toString() : '',
+      tender_value_cr: tender.tender_value_cr ? tender.tender_value_cr.toString() : '',
+      tender_fee_inr: tender.tender_fee_inr ? tender.tender_fee_inr.toString() : '',
+      emd_inr: tender.emd_inr ? tender.emd_inr.toString() : '',
       product_name: tender.product_name || '',
       product_type: tender.product_type || '',
       // Ensure documents array exists
       tender_documents: tender.tender_documents && tender.tender_documents.length > 0
-        ? tender.tender_documents
-        : [{ name: '', url: '' }]
+        ? tender.tender_documents.map(d => ({
+            name: d.name || d.document_name || 'Spec',
+            url: d.url || d.document_url || '',
+            uploading: false,
+            error: '',
+            fileName: d.fileName || d.document_name || d.name || (d.url || d.document_url || '').split('/').pop() || 'Uploaded.pdf',
+            ...(d.added_at ? { added_at: d.added_at } : {})
+          }))
+        : [
+            { name: 'Spec', url: '', uploading: false, error: '', fileName: '' },
+            { name: 'GCC', url: '', uploading: false, error: '', fileName: '' }
+          ]
     });
 
     const isStdName = PRODUCT_NAMES.includes(tender.product_name);
@@ -1674,27 +1686,58 @@ export default function TendersListView() {
       }
     }
 
+    const isEdit = isEditModalOpen;
+    const targetId = selectedTender?.id || formData.id;
+
+    if (isEdit && !targetId) {
+      setSubmitError('Tender ID is missing. Cannot update tender.');
+      setIsSubmitting(false);
+      return;
+    }
+
     // Format payload
-    const payload = {
-      tender_id: formData.tender_id,
-      tender_ref_no: formData.tender_ref_no,
-      tender_documents: formData.tender_documents.map(d => ({ name: d.name, url: d.url })),
-      tender_title: formData.tender_title,
-      tender_organization: formData.tender_organization,
-      cable_length_km: Number(formData.cable_length_km),
-      publish_date: formData.publish_date,
-      closing_date: formData.closing_date,
-      tender_value_cr: Number(formData.tender_value_cr),
-      tender_fee_inr: Number(formData.tender_fee_inr),
-      emd_inr: Number(formData.emd_inr),
-      state: formData.state,
-      product_name: formData.product_name,
-      product_type: formData.product_type
-    };
+    const payload = isEdit
+      ? {
+        id: targetId,
+        tender_id: formData.tender_id,
+        tender_ref_no: formData.tender_ref_no,
+        tender_documents: formData.tender_documents.map(d => ({
+          name: d.name,
+          url: d.url,
+          ...(d.added_at ? { added_at: d.added_at } : {})
+        })),
+        tender_title: formData.tender_title,
+        tender_organization: formData.tender_organization,
+        cable_length_km: Number(formData.cable_length_km),
+        publish_date: formData.publish_date,
+        closing_date: formData.closing_date,
+        tender_value_cr: Number(formData.tender_value_cr),
+        tender_fee_inr: Number(formData.tender_fee_inr),
+        emd_inr: Number(formData.emd_inr),
+        state: formData.state
+      }
+      : {
+        tender_id: formData.tender_id,
+        tender_ref_no: formData.tender_ref_no,
+        tender_documents: formData.tender_documents.map(d => ({ name: d.name, url: d.url })),
+        tender_title: formData.tender_title,
+        tender_organization: formData.tender_organization,
+        cable_length_km: Number(formData.cable_length_km),
+        publish_date: formData.publish_date,
+        closing_date: formData.closing_date,
+        tender_value_cr: Number(formData.tender_value_cr),
+        tender_fee_inr: Number(formData.tender_fee_inr),
+        emd_inr: Number(formData.emd_inr),
+        state: formData.state,
+        product_name: formData.product_name,
+        product_type: formData.product_type
+      };
+
+    const endpoint = isEdit ? 'update-tender-details' : 'create-tender';
 
     try {
       const token = localStorage.getItem('token') || '';
-      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/create-tender`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/tenders/${endpoint}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1705,8 +1748,8 @@ export default function TendersListView() {
 
       const responseData = await response.json().catch(() => null);
 
-      if (response.ok) {
-        setSubmitSuccess('Tender created successfully!');
+      if (response.ok && (responseData?.status === 'success' || !responseData?.status)) {
+        setSubmitSuccess(isEdit ? 'Tender details updated successfully!' : 'Tender created successfully!');
 
         // Refresh tenders from backend
         loadTenders();
@@ -1715,12 +1758,13 @@ export default function TendersListView() {
         setTimeout(() => {
           setIsAddModalOpen(false);
           setIsEditModalOpen(false);
+          setSelectedTender(null);
           setFormData(initialFormState);
           setSubmitSuccess('');
         }, 1500);
 
       } else {
-        const errorMsg = responseData?.message || responseData?.error || 'Failed to submit tender. Please try again.';
+        const errorMsg = responseData?.message || responseData?.error || (isEdit ? 'Failed to update tender details. Please try again.' : 'Failed to submit tender. Please try again.');
         setSubmitError(errorMsg);
       }
     } catch (err) {
