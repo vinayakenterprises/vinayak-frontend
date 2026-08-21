@@ -346,6 +346,7 @@ export default function TendersListView() {
     closing_date: '',
     tender_value_cr: '',
     tender_fee_inr: '',
+    processing_fee_inr: '',
     emd_inr: '',
     state: 'Uttar Pradesh',
     status: 'Active',
@@ -463,6 +464,7 @@ export default function TendersListView() {
       cable_length_km: tender.cable_length_km ? tender.cable_length_km.toString() : '',
       tender_value_cr: tender.tender_value_cr ? tender.tender_value_cr.toString() : '',
       tender_fee_inr: tender.tender_fee_inr ? tender.tender_fee_inr.toString() : '',
+      processing_fee_inr: tender.processing_fee_inr ? tender.processing_fee_inr.toString() : '',
       emd_inr: tender.emd_inr ? tender.emd_inr.toString() : '',
       product_name: tender.product_name || '',
       product_type: tender.product_type || '',
@@ -1626,7 +1628,7 @@ export default function TendersListView() {
     if (!formData.tender_id.trim() || !formData.tender_ref_no.trim() || !formData.tender_title.trim() ||
       !formData.tender_organization.trim() || !formData.cable_length_km || !formData.publish_date ||
       !formData.closing_date || !formData.tender_value_cr || !formData.tender_fee_inr ||
-      !formData.emd_inr || !formData.state ||
+      !formData.processing_fee_inr || !formData.emd_inr || !formData.state ||
       !formData.product_name || !formData.product_name.trim() ||
       !formData.product_type || !formData.product_type.trim()) {
       setSubmitError('All fields are required.');
@@ -1713,6 +1715,7 @@ export default function TendersListView() {
         closing_date: formData.closing_date,
         tender_value_cr: Number(formData.tender_value_cr),
         tender_fee_inr: Number(formData.tender_fee_inr),
+        processing_fee_inr: Number(formData.processing_fee_inr),
         emd_inr: Number(formData.emd_inr),
         state: formData.state
       }
@@ -1727,6 +1730,7 @@ export default function TendersListView() {
         closing_date: formData.closing_date,
         tender_value_cr: Number(formData.tender_value_cr),
         tender_fee_inr: Number(formData.tender_fee_inr),
+        processing_fee_inr: Number(formData.processing_fee_inr),
         emd_inr: Number(formData.emd_inr),
         state: formData.state,
         product_name: formData.product_name,
@@ -2295,6 +2299,21 @@ export default function TendersListView() {
                   />
                 </div>
 
+                {/* Processing Fee (INR) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Processing Fee (INR) <span className="text-rose-500">*</span></label>
+                  <input
+                    type="number"
+                    name="processing_fee_inr"
+                    value={formData.processing_fee_inr}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
+                    placeholder="e.g. 5000"
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-shadow"
+                  />
+                </div>
+
                 {/* EMD INR */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">EMD Amount (INR) <span className="text-rose-500">*</span></label>
@@ -2598,6 +2617,11 @@ export default function TendersListView() {
                   <div>
                     <span className="block text-[10px] font-bold text-slate-400 uppercase">Tender Fee / EMD</span>
                     <span className="text-xs font-semibold text-slate-700">₹{Number(selectedTender.tender_fee_inr || 0).toFixed(2)} / ₹{Number(selectedTender.emd_inr || 0).toFixed(2)}</span>
+                  </div>
+
+                  <div>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Processing Fee</span>
+                    <span className="text-xs font-semibold text-slate-700">₹{Number(selectedTender.processing_fee_inr || 0).toFixed(2)}</span>
                   </div>
                 </div>
 
