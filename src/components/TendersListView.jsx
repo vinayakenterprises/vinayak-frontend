@@ -299,7 +299,6 @@ export default function TendersListView() {
         safeFetch('get-approved-tenders-for-tender-agent')
       ]);
 
-      console.log("active tender lsit -> ", activeList);
 
       const mappedActive = activeList.map(t => ({ ...t, status: 'Active' }));
       const mappedPending = pendingList.map(t => ({ ...t, status: 'Pending MD Approval' }));
@@ -319,7 +318,6 @@ export default function TendersListView() {
         ...mappedApproved
       ];
 
-      console.log('Mapped and combined tenders count:', combined.length);
       setTenders(combined);
     } catch (err) {
       console.error(err);
@@ -401,6 +399,26 @@ export default function TendersListView() {
   const handleFileUpload = async (index, file) => {
     if (!file) return;
 
+    const docName = formData.tender_documents[index]?.name;
+
+    // Validate file format based on document type
+    if (docName === 'BOQ') {
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext !== 'xlsx' && ext !== 'xls') {
+        const updatedDocs = [...formData.tender_documents];
+        updatedDocs[index].error = 'Only Excel files (.xlsx, .xls) are allowed for BOQ.';
+        setFormData(prev => ({ ...prev, tender_documents: updatedDocs }));
+        return;
+      }
+    } else {
+      if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+        const updatedDocs = [...formData.tender_documents];
+        updatedDocs[index].error = 'Only PDF files (.pdf) are allowed.';
+        setFormData(prev => ({ ...prev, tender_documents: updatedDocs }));
+        return;
+      }
+    }
+
     // Update uploading state for this row
     const updatedDocs = [...formData.tender_documents];
     updatedDocs[index].uploading = true;
@@ -471,17 +489,17 @@ export default function TendersListView() {
       // Ensure documents array exists
       tender_documents: tender.tender_documents && tender.tender_documents.length > 0
         ? tender.tender_documents.map(d => ({
-            name: d.name || d.document_name || 'Spec',
-            url: d.url || d.document_url || '',
-            uploading: false,
-            error: '',
-            fileName: d.fileName || d.document_name || d.name || (d.url || d.document_url || '').split('/').pop() || 'Uploaded.pdf',
-            ...(d.added_at ? { added_at: d.added_at } : {})
-          }))
+          name: d.name || d.document_name || 'Spec',
+          url: d.url || d.document_url || '',
+          uploading: false,
+          error: '',
+          fileName: d.fileName || d.document_name || d.name || (d.url || d.document_url || '').split('/').pop() || 'Uploaded.pdf',
+          ...(d.added_at ? { added_at: d.added_at } : {})
+        }))
         : [
-            { name: 'Spec', url: '', uploading: false, error: '', fileName: '' },
-            { name: 'GCC', url: '', uploading: false, error: '', fileName: '' }
-          ]
+          { name: 'Spec', url: '', uploading: false, error: '', fileName: '' },
+          { name: 'GCC', url: '', uploading: false, error: '', fileName: '' }
+        ]
     });
 
     const isStdName = PRODUCT_NAMES.includes(tender.product_name);
@@ -2382,9 +2400,11 @@ export default function TendersListView() {
                           </select>
                         </div>
 
-                        {/* Document PDF Upload */}
+                        {/* Document Upload */}
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-505 uppercase mb-1">Document PDF <span className="text-rose-500">*</span></label>
+                          <label className="block text-[10px] font-bold text-slate-505 uppercase mb-1">
+                            {doc.name === 'BOQ' ? 'Document Excel (XLSX)' : 'Document PDF'} <span className="text-rose-500">*</span>
+                          </label>
                           <div className="flex items-center gap-2">
                             {doc.uploading ? (
                               <div className="flex items-center gap-1.5 py-1.5 text-xs text-slate-505 font-medium">
@@ -2392,7 +2412,7 @@ export default function TendersListView() {
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                 </svg>
-                                Uploading PDF...
+                                {doc.name === 'BOQ' ? 'Uploading Excel...' : 'Uploading PDF...'}
                               </div>
                             ) : doc.url ? (
                               <div className="flex-1 flex items-center justify-between bg-white border border-emerald-100 rounded px-2.5 py-1.5 text-xs text-emerald-700 font-medium truncate">
@@ -2400,7 +2420,7 @@ export default function TendersListView() {
                                   <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                   </svg>
-                                  {doc.fileName || 'Uploaded.pdf'}
+                                  {doc.fileName || (doc.name === 'BOQ' ? 'Uploaded.xlsx' : 'Uploaded.pdf')}
                                 </span>
                                 <a
                                   href={doc.url}
@@ -2429,7 +2449,7 @@ export default function TendersListView() {
                                 <input
                                   id={`file-upload-${idx}`}
                                   type="file"
-                                  accept=".pdf"
+                                  accept={doc.name === 'BOQ' ? '.xlsx,.xls' : '.pdf'}
                                   className="hidden"
                                   onChange={(e) => {
                                     const file = e.target.files?.[0];
@@ -2975,7 +2995,7 @@ export default function TendersListView() {
                             {renderSingleFileUploadDetails('fee_document', 'Fee Document (PDF)', '.pdf')}
                             {renderSingleFileUploadDetails('technical_document', 'Technical Document (PDF)', '.pdf')}
                             <div className="md:col-span-2">
-                              {renderSingleFileUploadDetails('boq_filled', 'BOQ Filled (Excel/PDF)', '.pdf,.xlsx,.xls')}
+                              {renderSingleFileUploadDetails('boq_filled', 'BOQ Filled (Excel XLSX)', '.xlsx,.xls')}
                             </div>
                           </div>
                         </div>
