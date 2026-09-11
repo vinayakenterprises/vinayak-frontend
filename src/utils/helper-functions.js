@@ -1,7 +1,5 @@
 export const formatToIST = (dateInput) => {
 
-  console.log("lsjdfdlj", dateInput);
-
   if (!dateInput) return 'N/A';
   let date;
   if (dateInput instanceof Date) {
@@ -34,10 +32,10 @@ export const calculateTenderSLAs = (tender, now = new Date()) => {
     if (isNaN(planned.getTime()) || isNaN(actual.getTime())) return '';
     const diffMs = actual.getTime() - planned.getTime();
     if (diffMs <= 0) return '';
-    
+
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
+
     let text = '';
     if (diffDays > 0) text += `${diffDays}d `;
     text += `${diffHours}h`;
